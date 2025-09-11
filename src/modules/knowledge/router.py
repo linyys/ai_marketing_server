@@ -1,159 +1,166 @@
-from fastapi import APIRouter, Depends, Query, Path, Body
+from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
 from db.database import get_db
 from schemas.knowledge import (
-    KnowledgeCreate, KnowledgeUpdate, KnowledgeOut, KnowledgeSearchParams,
-    KnowledgeListResponse, PaginationParams
+    KnowledgeCreate, KnowledgeUpdate, KnowledgeOut, KnowledgeListResponse,
+    KnowledgeSearchParams, PaginationParams
 )
 from modules.knowledge.controller import (
-    create_knowledge_item, get_knowledge_info, get_knowledge_info_by_uid, update_knowledge_info,
-    delete_knowledge_item, get_knowledges_list, search_knowledges_list,
-    batch_delete_knowledges_items, get_knowledge_statistics
+    create_knowledge_service, get_knowledge_service, get_knowledges_list_service,
+    get_user_knowledges_service, update_knowledge_service, delete_knowledge_service,
+    search_knowledges_service
 )
-from typing import Optional, List
-from datetime import datetime
+from utils.auth import get_current_user, get_current_admin, get_current_admin_or_user
+from typing import Optional
+import logging
 
-router = APIRouter(prefix="/knowledge", tags=["知识库管理"])
+logger = logging.getLogger(__name__)
+router = APIRouter(tags=["知识库"], prefix="/knowledge")
 
-@router.post("/", response_model=KnowledgeOut, summary="创建知识库")
+@router.get("/list", response_model=KnowledgeListResponse, summary="获取所有知识库列表")
+def get_knowledges_list(
+    skip: int = Query(0, ge=0, description="跳过记录数"),
+    limit: int = Query(20, ge=1, le=100, description="返回记录数限制"),
+    db: Session = Depends(get_db),
+    current_admin = Depends(get_current_admin)
+):
+    """获取所有知识库列表接口（仅管理员可访问）"""
+    logger.info(f"管理员 {current_admin.username} 请求知识库列表")
+    return get_knowledges_list_service(db, skip, limit, is_admin=True)
+
+@router.get("/list/{uid}", response_model=KnowledgeListResponse, summary="获取指定用户的知识库列表")
+def get_user_knowledges(
+    uid: str,
+    skip: int = Query(0, ge=0, description="跳过记录数"),
+    limit: int = Query(20, ge=1, le=100, description="返回记录数限制"),
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_admin_or_user)
+):
+    """获取指定用户的知识库列表接口（管理员或本人可访问）"""
+    # 检查权限：管理员或本人
+    from db.admin import Admin
+    is_admin = isinstance(current_user, Admin)
+    current_user_uid = current_user.uid
+    
+    if is_admin:
+        logger.info(f"管理员 {current_user.username} 请求用户 {uid} 的知识库列表")
+    else:
+        # 非管理员，检查是否为本人
+        if uid != current_user_uid:
+            logger.warning(f"用户 {current_user_uid} 尝试访问其他用户的知识库: {uid}")
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="无权限访问其他用户的知识库"
+            )
+        logger.info(f"用户 {current_user_uid} 请求自己的知识库列表")
+    
+    return get_user_knowledges_service(
+        db, uid, skip, limit, current_user_uid, is_admin
+    )
+
+@router.get("/get/{uid}", response_model=KnowledgeOut, summary="获取指定知识库详情")
+def get_knowledge(
+    uid: str,
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_admin_or_user)
+):
+    """获取指定知识库详情接口（管理员或所有者可访问，公共知识库所有人可见）"""
+    # 检查权限：管理员或知识库所有者
+    from db.admin import Admin
+    is_admin = isinstance(current_user, Admin)
+    current_user_uid = current_user.uid
+    
+    if is_admin:
+        logger.info(f"管理员 {current_user.username} 请求知识库详情: {uid}")
+    else:
+        logger.info(f"用户 {current_user_uid} 请求知识库详情: {uid}")
+    
+    return get_knowledge_service(db, uid, current_user_uid, is_admin)
+
+@router.post("/search", response_model=KnowledgeListResponse, summary="搜索知识库")
+def search_knowledges(
+    search_params: KnowledgeSearchParams,
+    skip: int = Query(0, ge=0, description="跳过记录数"),
+    limit: int = Query(20, ge=1, le=100, description="返回记录数限制"),
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_admin_or_user)
+):
+    """搜索知识库接口（管理员可搜索所有，用户只能搜索自己可访问的）"""
+    # 检查权限：管理员或普通用户
+    from db.admin import Admin
+    is_admin = isinstance(current_user, Admin)
+    current_user_uid = current_user.uid
+    
+    if is_admin:
+        logger.info(f"管理员 {current_user.username} 搜索知识库")
+    else:
+        logger.info(f"用户 {current_user_uid} 搜索自己的知识库")
+    
+    return search_knowledges_service(
+        db, search_params, skip, limit, current_user_uid, is_admin
+    )
+
+@router.post("/create", response_model=KnowledgeOut, summary="创建知识库")
 def create_knowledge(
     knowledge_data: KnowledgeCreate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_admin_or_user)
 ):
-    """
-    创建知识库接口
+    """创建知识库接口（管理员和用户都可创建）"""
+    # 检查权限：管理员或普通用户
+    from db.admin import Admin
+    is_admin = isinstance(current_user, Admin)
     
-    - **name**: 名称（必填，最大50字符）
-    - **content**: 内容（必填，最大255字符）
-    - **description**: 描述（必填，最大255字符）
-    - **updated_admin_uid**: 更新管理员ID（必填）
-    """
-    return create_knowledge_item(db, knowledge_data)
-
-@router.get("/{knowledge_id}", response_model=KnowledgeOut, summary="获取知识库信息")
-def get_knowledge(
-    knowledge_id: int = Path(..., description="知识库ID"),
-    db: Session = Depends(get_db)
-):
-    """
-    根据ID获取知识库信息
+    if is_admin:
+        from_user = None  # 管理员创建的知识库为公共知识库
+        logger.info(f"管理员 {current_user.username} 创建知识库: {knowledge_data.name}")
+    else:
+        from_user = current_user.uid  # 用户创建的知识库为私有知识库
+        logger.info(f"用户 {current_user.uid} 创建知识库: {knowledge_data.name}")
     
-    - **knowledge_id**: 知识库ID
-    """
-    return get_knowledge_info(db, knowledge_id)
+    return create_knowledge_service(db, knowledge_data, from_user, is_admin)
 
-@router.get("/uid/{uid}", response_model=KnowledgeOut, summary="根据UID获取知识库信息")
-def get_knowledge_by_uid(
-    uid: str = Path(..., description="知识库UID"),
-    db: Session = Depends(get_db)
-):
-    """
-    根据UID获取知识库信息
-    
-    - **uid**: 知识库UID
-    """
-    return get_knowledge_info_by_uid(db, uid)
-
-@router.put("/{knowledge_id}", response_model=KnowledgeOut, summary="更新知识库信息")
+@router.post("/update", response_model=KnowledgeOut, summary="更新知识库")
 def update_knowledge(
-    knowledge_id: int = Path(..., description="知识库ID"),
-    update_data: KnowledgeUpdate = Body(...),
-    db: Session = Depends(get_db)
+    uid: str,
+    knowledge_data: KnowledgeUpdate,
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_admin_or_user)
 ):
-    """
-    更新知识库信息
+    """更新知识库接口（管理员或所有者可更新）"""
+    # 检查权限：管理员或知识库所有者
+    try:
+        # 尝试获取管理员权限
+        admin = get_current_admin()
+        is_admin = True
+        current_user_uid = admin.uid
+        logger.info(f"管理员 {admin.username} 更新知识库 {uid}")
+    except:
+        # 非管理员，需要在service层检查是否为知识库所有者
+        is_admin = False
+        current_user_uid = current_user.uid
+        logger.info(f"用户 {current_user_uid} 更新知识库 {uid}")
     
-    - **knowledge_id**: 知识库ID
-    - **name**: 名称（可选）
-    - **content**: 内容（可选）
-    - **description**: 描述（可选）
-    - **updated_admin_uid**: 更新管理员ID（必填）
-    """
-    return update_knowledge_info(db, knowledge_id, update_data)
+    return update_knowledge_service(db, uid, knowledge_data, current_user_uid, is_admin)
 
-@router.delete("/{knowledge_id}", summary="删除知识库")
+@router.post("/delete", summary="删除知识库")
 def delete_knowledge(
-    knowledge_id: int = Path(..., description="知识库ID"),
-    db: Session = Depends(get_db)
+    uid: str,
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_admin_or_user)
 ):
-    """
-    删除知识库（软删除）
+    """删除知识库接口（管理员或所有者可删除）"""
+    # 检查权限：管理员或知识库所有者
+    try:
+        # 尝试获取管理员权限
+        admin = get_current_admin()
+        is_admin = True
+        current_user_uid = admin.uid
+        logger.info(f"管理员 {admin.username} 删除知识库 {uid}")
+    except:
+        # 非管理员，需要在service层检查是否为知识库所有者
+        is_admin = False
+        current_user_uid = current_user.uid
+        logger.info(f"用户 {current_user_uid} 删除知识库 {uid}")
     
-    - **knowledge_id**: 知识库ID
-    """
-    return delete_knowledge_item(db, knowledge_id)
-
-@router.get("/", response_model=KnowledgeListResponse, summary="获取知识库列表")
-def get_knowledges(
-    page: int = Query(1, ge=1, description="页码"),
-    page_size: int = Query(20, ge=1, le=100, description="每页数量"),
-    db: Session = Depends(get_db)
-):
-    """
-    获取知识库列表
-    
-    - **page**: 页码（从1开始）
-    - **page_size**: 每页数量（1-100）
-    """
-    skip = (page - 1) * page_size
-    pagination = PaginationParams(skip=skip, limit=page_size)
-    return get_knowledges_list(db, pagination)
-
-@router.get("/search/", response_model=KnowledgeListResponse, summary="搜索知识库")
-def search_knowledges(
-    page: int = Query(1, ge=1, description="页码"),
-    page_size: int = Query(20, ge=1, le=100, description="每页数量"),
-    name: Optional[str] = Query(None, description="名称（模糊搜索）"),
-    content: Optional[str] = Query(None, description="内容（模糊搜索）"),
-    description: Optional[str] = Query(None, description="描述（模糊搜索）"),
-    updated_admin_uid: Optional[str] = Query(None, description="更新管理员ID"),
-    start_time: Optional[datetime] = Query(None, description="创建开始时间"),
-    end_time: Optional[datetime] = Query(None, description="创建结束时间"),
-    db: Session = Depends(get_db)
-):
-    """
-    搜索知识库
-    
-    - **page**: 页码（从1开始）
-    - **page_size**: 每页数量（1-100）
-    - **name**: 名称（模糊搜索）
-    - **content**: 内容（模糊搜索）
-    - **description**: 描述（模糊搜索）
-    - **updated_admin_uid**: 更新管理员ID
-    - **start_time**: 创建开始时间
-    - **end_time**: 创建结束时间
-    """
-    skip = (page - 1) * page_size
-    pagination = PaginationParams(skip=skip, limit=page_size)
-    search_params = KnowledgeSearchParams(
-        name=name,
-        content=content,
-        description=description,
-        updated_admin_uid=updated_admin_uid,
-        start_time=start_time,
-        end_time=end_time
-    )
-    return search_knowledges_list(db, search_params, pagination)
-
-@router.delete("/batch/", summary="批量删除知识库")
-def batch_delete_knowledges(
-    knowledge_ids: List[int] = Body(..., description="知识库ID列表"),
-    db: Session = Depends(get_db)
-):
-    """
-    批量删除知识库（软删除）
-    
-    - **knowledge_ids**: 知识库ID列表
-    """
-    return batch_delete_knowledges_items(db, knowledge_ids)
-
-@router.get("/stats/overview", summary="知识库统计概览")
-def get_knowledge_stats(
-    db: Session = Depends(get_db)
-):
-    """
-    获取知识库统计概览
-    
-    返回知识库的总数量和今日新增数量
-    """
-    return get_knowledge_statistics(db)
+    return delete_knowledge_service(db, uid, current_user_uid, is_admin)

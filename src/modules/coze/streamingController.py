@@ -1,7 +1,7 @@
 from fastapi import Request
 import httpx
 from utils import config, http_request
-from utils.workflow_config import get_workflow_id
+from utils.workflow_config import get_workflow_id_by_function
 from typing import TypedDict
 
 
@@ -57,7 +57,7 @@ async def forward_sse(request: Request, workflow_id: str, params: dict):
 class _test(TypedDict):
     input: str
 async def test(request: Request, params: _test):
-    return forward_sse(request, get_workflow_id("test"), params)
+    return forward_sse(request, get_workflow_id_by_function("test"), params)
 
 
 

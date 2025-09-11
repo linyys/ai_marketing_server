@@ -1,11 +1,11 @@
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, or_
 from db.user import User
-from schemas.user import UserCreate, UserUpdate, UserSearchParams
 from typing import List, Optional
 from passlib.context import CryptContext
 from datetime import datetime
 import logging
+import uuid
 
 logger = logging.getLogger(__name__)
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -18,174 +18,171 @@ def get_password_hash(password: str) -> str:
     """获取密码哈希"""
     return pwd_context.hash(password)
 
-def get_user_by_id(db: Session, user_id: int) -> Optional[User]:
-    """根据ID获取用户"""
-    return db.query(User).filter(
-        and_(User.id == user_id, User.is_del == 0)
-    ).first()
-
-def get_user_by_email(db: Session, email: str) -> Optional[User]:
-    """根据邮箱获取用户"""
-    return db.query(User).filter(
-        and_(User.email == email, User.is_del == 0)
-    ).first()
-
-def get_user_by_username(db: Session, username: str) -> Optional[User]:
-    """根据用户名获取用户"""
-    return db.query(User).filter(
-        and_(User.username == username, User.is_del == 0)
-    ).first()
-
-def get_user_by_uid(db: Session, uid: str) -> Optional[User]:
-    """根据UID获取用户"""
-    return db.query(User).filter(
-        and_(User.uid == uid, User.is_del == 0)
-    ).first()
-
-def get_users(db: Session, skip: int = 0, limit: int = 20) -> List[User]:
-    """获取用户列表"""
-    return db.query(User).filter(
-        User.is_del == 0
-    ).offset(skip).limit(limit).all()
-
-def get_users_count(db: Session) -> int:
-    """获取用户总数"""
-    return db.query(User).filter(User.is_del == 0).count()
-
-def create_user(db: Session, user: UserCreate) -> User:
+def create_user(db: Session, username: str, email: str, password: str, phone: Optional[str] = None) -> User:
     """创建用户"""
     # 检查邮箱是否已存在
-    existing_user = get_user_by_email(db, user.email)
-    if existing_user:
-        raise ValueError("邮箱已存在")
+    existing_user_by_email = get_user_by_email(db, email)
+    if existing_user_by_email:
+        raise ValueError("邮箱已被注册")
     
     # 检查用户名是否已存在
-    existing_username = get_user_by_username(db, user.username)
-    if existing_username:
-        raise ValueError("用户名已存在")
+    existing_user_by_username = get_user_by_username(db, username)
+    if existing_user_by_username:
+        raise ValueError("用户名已被使用")
     
-    # 创建新用户
-    hashed_password = get_password_hash(user.password)
+    hashed_password = get_password_hash(password)
+    user_uid = str(uuid.uuid4())
+    
     db_user = User(
-        username=user.username,
-        email=user.email,
+        uid=user_uid,
+        username=username,
+        email=email,
         password_hash=hashed_password,
-        phone=user.phone,
-
-        is_del=0
+        phone=phone
     )
     
     db.add(db_user)
     db.commit()
     db.refresh(db_user)
-    logger.info(f"Created user: {db_user.username} ({db_user.email})")
+    
+    logger.info(f"User created: {db_user.username} ({db_user.email})")
     return db_user
 
-def update_user(db: Session, user_id: int, update_data: UserUpdate) -> Optional[User]:
-    """更新用户信息"""
-    user = get_user_by_id(db, user_id)
-    if not user:
-        return None
-    
-    update_dict = update_data.dict(exclude_unset=True)
-    
-    # 检查邮箱唯一性
-    if 'email' in update_dict:
-        existing_user = db.query(User).filter(
-            and_(User.email == update_dict['email'], User.id != user_id, User.is_del == 0)
-        ).first()
-        if existing_user:
-            raise ValueError("邮箱已存在")
-    
-    # 检查用户名唯一性
-    if 'username' in update_dict:
-        existing_user = db.query(User).filter(
-            and_(User.username == update_dict['username'], User.id != user_id, User.is_del == 0)
-        ).first()
-        if existing_user:
-            raise ValueError("用户名已存在")
-    
-    # 更新字段
-    for field, value in update_dict.items():
-        setattr(user, field, value)
-    
-    db.commit()
-    db.refresh(user)
-    logger.info(f"Updated user: {user.username} ({user.email})")
-    return user
+def get_user_by_email(db: Session, email: str) -> Optional[User]:
+    """根据邮箱获取用户"""
+    return db.query(User).filter(and_(User.email == email, User.is_del == 0)).first()
 
-def update_user_password(db: Session, user_id: int, old_password: str, new_password: str) -> bool:
-    """更新用户密码"""
-    user = get_user_by_id(db, user_id)
-    if not user:
-        return False
-    
-    # 验证旧密码
-    if not verify_password(old_password, user.password_hash):
-        raise ValueError("原密码不正确")
-    
-    # 更新密码
-    user.password_hash = get_password_hash(new_password)
-    db.commit()
-    logger.info(f"Updated password for user: {user.username}")
-    return True
+def get_user_by_username(db: Session, username: str) -> Optional[User]:
+    """根据用户名获取用户"""
+    return db.query(User).filter(and_(User.username == username, User.is_del == 0)).first()
 
-def soft_delete_user(db: Session, user_id: int) -> bool:
-    """软删除用户"""
-    user = get_user_by_id(db, user_id)
-    if not user:
-        return False
-    
-    user.is_del = 1
-    db.commit()
-    logger.info(f"Soft deleted user: {user.username} ({user.email})")
-    return True
+def get_user_by_uid(db: Session, uid: str) -> Optional[User]:
+    """根据UID获取用户"""
+    return db.query(User).filter(and_(User.uid == uid, User.is_del == 0)).first()
+
+def get_users(db: Session, skip: int = 0, limit: int = 20) -> List[User]:
+    """获取用户列表"""
+    return db.query(User).filter(User.is_del == 0).offset(skip).limit(limit).all()
+
+def get_users_count(db: Session) -> int:
+    """获取用户总数"""
+    return db.query(User).filter(User.is_del == 0).count()
 
 def authenticate_user(db: Session, email: str, password: str) -> Optional[User]:
     """用户认证"""
     user = get_user_by_email(db, email)
     if not user:
+        logger.warning(f"User authentication failed: email {email} not found")
         return None
     
     if not verify_password(password, user.password_hash):
+        logger.warning(f"User authentication failed: incorrect password for {email}")
         return None
     
-    # 更新最后登录时间
-    user.last_login_time = datetime.now()
-    db.commit()
-    
-    logger.info(f"User authenticated: {user.username} ({user.email})")
+    logger.info(f"User authenticated successfully: {user.username} ({user.email})")
     return user
 
-def search_users(db: Session, search_params: UserSearchParams, skip: int = 0, limit: int = 20) -> tuple[List[User], int]:
+def update_user_last_login(db: Session, user_uid: str) -> bool:
+    """更新用户最后登录时间"""
+    try:
+        user = get_user_by_uid(db, user_uid)
+        if user:
+            user.last_login_time = datetime.now()
+            db.commit()
+            return True
+        return False
+    except Exception as e:
+        logger.error(f"Failed to update last login time for user {user_uid}: {e}")
+        db.rollback()
+        return False
+
+def update_user(db: Session, user_uid: str, username: Optional[str] = None, email: Optional[str] = None, phone: Optional[str] = None) -> Optional[User]:
+    """更新用户信息"""
+    try:
+        user = get_user_by_uid(db, user_uid)
+        if not user:
+            return None
+        
+        # 检查用户名是否已被其他用户使用
+        if username and username != user.username:
+            existing_user = get_user_by_username(db, username)
+            if existing_user and existing_user.uid != user_uid:
+                raise ValueError("用户名已被使用")
+            user.username = username
+        
+        # 检查邮箱是否已被其他用户使用
+        if email and email != user.email:
+            existing_user = get_user_by_email(db, email)
+            if existing_user and existing_user.uid != user_uid:
+                raise ValueError("邮箱已被注册")
+            user.email = email
+        
+        if phone is not None:
+            user.phone = phone
+        
+        user.updated_time = datetime.now()
+        db.commit()
+        db.refresh(user)
+        
+        logger.info(f"User updated: {user.username} ({user.email})")
+        return user
+    except Exception as e:
+        logger.error(f"Failed to update user {user_uid}: {e}")
+        db.rollback()
+        raise
+
+def update_user_password(db: Session, user_uid: str, new_password: str) -> bool:
+    """更新用户密码"""
+    try:
+        user = get_user_by_uid(db, user_uid)
+        if not user:
+            return False
+        
+        user.password_hash = get_password_hash(new_password)
+        user.updated_time = datetime.now()
+        db.commit()
+        
+        logger.info(f"Password updated for user: {user.username}")
+        return True
+    except Exception as e:
+        logger.error(f"Failed to update password for user {user_uid}: {e}")
+        db.rollback()
+        return False
+
+def delete_user(db: Session, user_uid: str) -> bool:
+    """软删除用户"""
+    try:
+        user = get_user_by_uid(db, user_uid)
+        if not user:
+            return False
+        
+        user.is_del = 1
+        user.updated_time = datetime.now()
+        db.commit()
+        
+        logger.info(f"User deleted: {user.username} ({user.email})")
+        return True
+    except Exception as e:
+        logger.error(f"Failed to delete user {user_uid}: {e}")
+        db.rollback()
+        return False
+
+def search_users(db: Session, username: Optional[str] = None, email: Optional[str] = None, phone: Optional[str] = None, start_time: Optional[datetime] = None, end_time: Optional[datetime] = None, skip: int = 0, limit: int = 20) -> tuple[List[User], int]:
     """搜索用户"""
     query = db.query(User).filter(User.is_del == 0)
     
-    # 构建搜索条件
-    conditions = []
+    if username:
+        query = query.filter(User.username.contains(username))
+    if email:
+        query = query.filter(User.email.contains(email))
+    if phone:
+        query = query.filter(User.phone.contains(phone))
+    if start_time:
+        query = query.filter(User.created_time >= start_time)
+    if end_time:
+        query = query.filter(User.created_time <= end_time)
     
-    if search_params.username:
-        conditions.append(User.username.like(f"%{search_params.username}%"))
-    
-    if search_params.email:
-        conditions.append(User.email.like(f"%{search_params.email}%"))
-    
-    if search_params.role:
-        conditions.append(User.role == search_params.role)
-    
-    if search_params.start_time:
-        conditions.append(User.created_time >= search_params.start_time)
-    
-    if search_params.end_time:
-        conditions.append(User.created_time <= search_params.end_time)
-    
-    if conditions:
-        query = query.filter(and_(*conditions))
-    
-    # 获取总数
     total = query.count()
-    
-    # 分页查询
     users = query.offset(skip).limit(limit).all()
     
     return users, total

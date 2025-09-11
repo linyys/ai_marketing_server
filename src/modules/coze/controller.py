@@ -1,7 +1,7 @@
 from pydantic_core.core_schema import dataclass_field
 from utils import config, http_request
 from .task_manager import global_task_manager
-from utils.workflow_config import get_workflow_id
+from utils.workflow_config import get_workflow_id_by_function
 from typing import TypedDict, List, Dict, Any
 from fastapi import UploadFile, HTTPException
 import httpx

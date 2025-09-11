@@ -1,160 +1,211 @@
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, or_
 from db.knowledges import Knowledge
-from schemas.knowledge import KnowledgeCreate, KnowledgeUpdate, KnowledgeSearchParams
 from typing import List, Optional
 from datetime import datetime
 import logging
+import uuid
 
 logger = logging.getLogger(__name__)
 
-def get_knowledge_by_id(db: Session, knowledge_id: int) -> Optional[Knowledge]:
-    """根据ID获取知识库"""
-    return db.query(Knowledge).filter(
-        and_(Knowledge.id == knowledge_id, Knowledge.is_del == 0)
-    ).first()
+def create_knowledge(db: Session, name: str, content: str, description: str, from_user: Optional[str] = None) -> Knowledge:
+    """创建知识库"""
+    # 检查名称是否已存在
+    existing_knowledge = get_knowledge_by_name(db, name)
+    if existing_knowledge:
+        raise ValueError("知识库名称已存在")
+    
+    try:
+        db_knowledge = Knowledge(
+            uid=str(uuid.uuid4()),
+            name=name,
+            content=content,
+            description=description,
+            from_user=from_user,
+            is_del=0
+        )
+        db.add(db_knowledge)
+        db.commit()
+        db.refresh(db_knowledge)
+        logger.info(f"知识库创建成功: {db_knowledge.uid}")
+        return db_knowledge
+    except Exception as e:
+        db.rollback()
+        logger.error(f"创建知识库失败: {str(e)}")
+        raise ValueError(f"创建知识库失败: {str(e)}")
+
+def get_knowledge_by_name(db: Session, name: str) -> Optional[Knowledge]:
+    """根据名称获取知识库"""
+    return db.query(Knowledge).filter(and_(Knowledge.name == name, Knowledge.is_del == 0)).first()
 
 def get_knowledge_by_uid(db: Session, uid: str) -> Optional[Knowledge]:
     """根据UID获取知识库"""
-    return db.query(Knowledge).filter(
-        and_(Knowledge.uid == uid, Knowledge.is_del == 0)
-    ).first()
+    return db.query(Knowledge).filter(and_(Knowledge.uid == uid, Knowledge.is_del == 0)).first()
 
 def get_knowledges(db: Session, skip: int = 0, limit: int = 20) -> List[Knowledge]:
     """获取知识库列表"""
-    return db.query(Knowledge).filter(
-        Knowledge.is_del == 0
-    ).offset(skip).limit(limit).all()
+    return db.query(Knowledge).filter(Knowledge.is_del == 0).offset(skip).limit(limit).all()
 
 def get_knowledges_count(db: Session) -> int:
     """获取知识库总数"""
     return db.query(Knowledge).filter(Knowledge.is_del == 0).count()
 
-def create_knowledge(db: Session, knowledge: KnowledgeCreate) -> Knowledge:
-    """创建知识库"""
-    try:
-        db_knowledge = Knowledge(
-            name=knowledge.name,
-            content=knowledge.content,
-            description=knowledge.description,
-            updated_admin_uid=knowledge.updated_admin_uid
-        )
-        db.add(db_knowledge)
-        db.commit()
-        db.refresh(db_knowledge)
-        logger.info(f"Knowledge created successfully: {db_knowledge.uid}")
-        return db_knowledge
-    except Exception as e:
-        db.rollback()
-        logger.error(f"Error creating knowledge: {e}")
-        raise e
+def get_knowledges_by_user(db: Session, user_uid: str, skip: int = 0, limit: int = 20) -> List[Knowledge]:
+    """获取指定用户的知识库列表"""
+    return db.query(Knowledge).filter(
+        and_(Knowledge.from_user == user_uid, Knowledge.is_del == 0)
+    ).offset(skip).limit(limit).all()
 
-def update_knowledge(db: Session, knowledge_id: int, update_data: KnowledgeUpdate) -> Optional[Knowledge]:
+def get_knowledges_by_user_count(db: Session, user_uid: str) -> int:
+    """获取指定用户的知识库总数"""
+    return db.query(Knowledge).filter(
+        and_(Knowledge.from_user == user_uid, Knowledge.is_del == 0)
+    ).count()
+
+def get_public_knowledges(db: Session, skip: int = 0, limit: int = 20) -> List[Knowledge]:
+    """获取公共知识库列表（from_user为空）"""
+    return db.query(Knowledge).filter(
+        and_(Knowledge.from_user.is_(None), Knowledge.is_del == 0)
+    ).offset(skip).limit(limit).all()
+
+def get_user_accessible_knowledges(db: Session, user_uid: str, skip: int = 0, limit: int = 20) -> List[Knowledge]:
+    """获取用户可访问的知识库列表（自己的+公共的）"""
+    return db.query(Knowledge).filter(
+        and_(
+            or_(Knowledge.from_user == user_uid, Knowledge.from_user.is_(None)),
+            Knowledge.is_del == 0
+        )
+    ).offset(skip).limit(limit).all()
+
+def get_user_accessible_knowledges_count(db: Session, user_uid: str) -> int:
+    """获取用户可访问的知识库总数"""
+    return db.query(Knowledge).filter(
+        and_(
+            or_(Knowledge.from_user == user_uid, Knowledge.from_user.is_(None)),
+            Knowledge.is_del == 0
+        )
+    ).count()
+
+def update_knowledge(db: Session, knowledge_uid: str, name: Optional[str] = None, 
+                    content: Optional[str] = None, description: Optional[str] = None) -> Optional[Knowledge]:
     """更新知识库"""
     try:
-        db_knowledge = get_knowledge_by_id(db, knowledge_id)
+        db_knowledge = get_knowledge_by_uid(db, knowledge_uid)
         if not db_knowledge:
+            logger.warning(f"知识库不存在: {knowledge_uid}")
             return None
         
-        update_dict = update_data.model_dump(exclude_unset=True)
-        if not update_dict:
-            return db_knowledge
+        # 检查名称是否已被其他知识库使用
+        if name and name != db_knowledge.name:
+            existing_knowledge = get_knowledge_by_name(db, name)
+            if existing_knowledge and existing_knowledge.uid != knowledge_uid:
+                raise ValueError("知识库名称已存在")
         
-        for field, value in update_dict.items():
-            if hasattr(db_knowledge, field):
-                setattr(db_knowledge, field, value)
+        update_data = {}
+        if name is not None:
+            update_data['name'] = name
+        if content is not None:
+            update_data['content'] = content
+        if description is not None:
+            update_data['description'] = description
         
-        db_knowledge.updated_time = datetime.now()
-        db.commit()
-        db.refresh(db_knowledge)
-        logger.info(f"Knowledge updated successfully: {db_knowledge.uid}")
+        if update_data:
+            for key, value in update_data.items():
+                setattr(db_knowledge, key, value)
+            
+            db.commit()
+            db.refresh(db_knowledge)
+            logger.info(f"知识库更新成功: {knowledge_uid}")
+        
         return db_knowledge
     except Exception as e:
         db.rollback()
-        logger.error(f"Error updating knowledge {knowledge_id}: {e}")
-        raise e
+        logger.error(f"更新知识库失败: {str(e)}")
+        raise ValueError(f"更新知识库失败: {str(e)}")
 
-def soft_delete_knowledge(db: Session, knowledge_id: int) -> bool:
-    """软删除知识库"""
+def delete_knowledge(db: Session, knowledge_uid: str) -> bool:
+    """删除知识库（软删除）"""
     try:
-        db_knowledge = get_knowledge_by_id(db, knowledge_id)
+        db_knowledge = get_knowledge_by_uid(db, knowledge_uid)
         if not db_knowledge:
+            logger.warning(f"知识库不存在: {knowledge_uid}")
             return False
         
         db_knowledge.is_del = 1
-        db_knowledge.updated_time = datetime.now()
         db.commit()
-        logger.info(f"Knowledge soft deleted successfully: {db_knowledge.uid}")
+        logger.info(f"知识库删除成功: {knowledge_uid}")
         return True
     except Exception as e:
         db.rollback()
-        logger.error(f"Error soft deleting knowledge {knowledge_id}: {e}")
-        raise e
+        logger.error(f"删除知识库失败: {str(e)}")
+        return False
 
-def search_knowledges(db: Session, search_params: KnowledgeSearchParams, skip: int = 0, limit: int = 20) -> tuple[List[Knowledge], int]:
+def search_knowledges(db: Session, name: Optional[str] = None, content: Optional[str] = None, 
+                     description: Optional[str] = None, from_user: Optional[str] = None,
+                     start_time: Optional[datetime] = None, end_time: Optional[datetime] = None,
+                     skip: int = 0, limit: int = 20) -> tuple[List[Knowledge], int]:
     """搜索知识库"""
-    try:
-        query = db.query(Knowledge).filter(Knowledge.is_del == 0)
-        
-        if search_params.name:
-            query = query.filter(Knowledge.name.like(f"%{search_params.name}%"))
-        
-        if search_params.content:
-            query = query.filter(Knowledge.content.like(f"%{search_params.content}%"))
-        
-        if search_params.description:
-            query = query.filter(Knowledge.description.like(f"%{search_params.description}%"))
-        
-        if search_params.updated_admin_uid:
-            query = query.filter(Knowledge.updated_admin_uid == search_params.updated_admin_uid)
-        
-        if search_params.start_time:
-            query = query.filter(Knowledge.created_time >= search_params.start_time)
-        
-        if search_params.end_time:
-            query = query.filter(Knowledge.created_time <= search_params.end_time)
-        
-        total = query.count()
-        knowledges = query.offset(skip).limit(limit).all()
-        
-        return knowledges, total
-    except Exception as e:
-        logger.error(f"Error searching knowledges: {e}")
-        raise e
+    query = db.query(Knowledge).filter(Knowledge.is_del == 0)
+    
+    if name:
+        query = query.filter(Knowledge.name.like(f"%{name}%"))
+    if content:
+        query = query.filter(Knowledge.content.like(f"%{content}%"))
+    if description:
+        query = query.filter(Knowledge.description.like(f"%{description}%"))
+    if from_user:
+        query = query.filter(Knowledge.from_user == from_user)
+    if start_time:
+        query = query.filter(Knowledge.created_time >= start_time)
+    if end_time:
+        query = query.filter(Knowledge.created_time <= end_time)
+    
+    total = query.count()
+    knowledges = query.offset(skip).limit(limit).all()
+    
+    return knowledges, total
 
-def batch_delete_knowledges(db: Session, knowledge_ids: List[int]) -> bool:
-    """批量删除知识库"""
-    try:
-        db.query(Knowledge).filter(
-            and_(Knowledge.id.in_(knowledge_ids), Knowledge.is_del == 0)
-        ).update(
-            {Knowledge.is_del: 1, Knowledge.updated_time: datetime.now()},
-            synchronize_session=False
+def search_user_accessible_knowledges(db: Session, user_uid: str, name: Optional[str] = None, 
+                                     content: Optional[str] = None, description: Optional[str] = None,
+                                     start_time: Optional[datetime] = None, end_time: Optional[datetime] = None,
+                                     skip: int = 0, limit: int = 20) -> tuple[List[Knowledge], int]:
+    """搜索用户可访问的知识库"""
+    query = db.query(Knowledge).filter(
+        and_(
+            or_(Knowledge.from_user == user_uid, Knowledge.from_user.is_(None)),
+            Knowledge.is_del == 0
         )
-        db.commit()
-        logger.info(f"Batch deleted knowledges: {knowledge_ids}")
-        return True
-    except Exception as e:
-        db.rollback()
-        logger.error(f"Error batch deleting knowledges {knowledge_ids}: {e}")
-        raise e
+    )
+    
+    if name:
+        query = query.filter(Knowledge.name.like(f"%{name}%"))
+    if content:
+        query = query.filter(Knowledge.content.like(f"%{content}%"))
+    if description:
+        query = query.filter(Knowledge.description.like(f"%{description}%"))
+    if start_time:
+        query = query.filter(Knowledge.created_time >= start_time)
+    if end_time:
+        query = query.filter(Knowledge.created_time <= end_time)
+    
+    total = query.count()
+    knowledges = query.offset(skip).limit(limit).all()
+    
+    return knowledges, total
 
-def get_knowledge_stats(db: Session) -> dict:
-    """获取知识库统计信息"""
-    try:
-        total_count = db.query(Knowledge).filter(Knowledge.is_del == 0).count()
-        today = datetime.now().date()
-        today_count = db.query(Knowledge).filter(
-            and_(
-                Knowledge.is_del == 0,
-                Knowledge.created_time >= today
-            )
-        ).count()
-        
-        return {
-            "total_count": total_count,
-            "today_count": today_count
-        }
-    except Exception as e:
-        logger.error(f"Error getting knowledge stats: {e}")
-        raise e
+def check_knowledge_permission(db: Session, knowledge_uid: str, user_uid: str) -> tuple[bool, Optional[Knowledge]]:
+    """检查用户对知识库的权限"""
+    knowledge = get_knowledge_by_uid(db, knowledge_uid)
+    if not knowledge:
+        return False, None
+    
+    # 如果是公共知识库（from_user为空），用户可以查看但不能编辑
+    if knowledge.from_user is None:
+        return True, knowledge
+    
+    # 如果是用户自己的知识库，有完全权限
+    if knowledge.from_user == user_uid:
+        return True, knowledge
+    
+    # 其他情况无权限
+    return False, knowledge

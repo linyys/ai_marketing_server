@@ -7,7 +7,6 @@ class KnowledgeCreate(BaseModel):
     name: str = Field(..., min_length=1, max_length=50, description="名称")
     content: str = Field(..., min_length=1, max_length=255, description="内容")
     description: str = Field(..., min_length=1, max_length=255, description="描述")
-    updated_admin_uid: str = Field(..., description="更新管理员ID")
     
     @field_validator('name')
     @classmethod
@@ -38,7 +37,6 @@ class KnowledgeUpdate(BaseModel):
     name: Optional[str] = Field(None, min_length=1, max_length=50, description="名称")
     content: Optional[str] = Field(None, min_length=1, max_length=255, description="内容")
     description: Optional[str] = Field(None, min_length=1, max_length=255, description="描述")
-    updated_admin_uid: str = Field(..., description="更新管理员ID")
     
     @field_validator('name')
     @classmethod
@@ -74,7 +72,7 @@ class KnowledgeOut(BaseModel):
     name: str
     content: str
     description: str
-    updated_admin_uid: str
+    from_user: Optional[str]
     created_time: datetime
     updated_time: datetime
     
@@ -87,7 +85,7 @@ class KnowledgeOut(BaseModel):
                 "name": "产品介绍",
                 "content": "这是一个优秀的产品...",
                 "description": "产品相关知识库",
-                "updated_admin_uid": "admin-uid-123",
+                "from_user": "user-uid-123",
                 "created_time": "2023-01-01T12:00:00",
                 "updated_time": "2023-01-01T12:00:00"
             }
@@ -105,7 +103,7 @@ class KnowledgeSearchParams(BaseModel):
     name: Optional[str] = None
     content: Optional[str] = None
     description: Optional[str] = None
-    updated_admin_uid: Optional[str] = None
+    from_user: Optional[str] = None
     start_time: Optional[datetime] = None
     end_time: Optional[datetime] = None
 

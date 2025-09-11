@@ -88,8 +88,6 @@ class UserOut(BaseModel):
                 "username": "张三",
                 "email": "zhangsan@example.com",
                 "phone": "13800138000",
-
-
                 "created_time": "2023-01-01T12:00:00",
                 "updated_time": "2023-01-01T12:00:00",
                 "last_login_time": "2023-01-01T12:00:00"
@@ -107,7 +105,6 @@ class UserSearchParams(BaseModel):
     """用户搜索参数模型"""
     username: Optional[str] = None
     email: Optional[str] = None
-
     start_time: Optional[datetime] = None
     end_time: Optional[datetime] = None
 

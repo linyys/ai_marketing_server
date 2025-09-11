@@ -1,13 +1,7 @@
 from pydantic import BaseModel, Field, field_validator, EmailStr
 from typing import Optional, List
 from datetime import datetime
-from enum import Enum
 import re
-
-class AdminRole(str, Enum):
-    """管理员角色枚举"""
-    SUPER_ADMIN = "super_admin"
-    ADMIN = "admin"
 
 class AdminCreate(BaseModel):
     """创建管理员请求模型"""
@@ -15,7 +9,7 @@ class AdminCreate(BaseModel):
     email: EmailStr = Field(..., description="管理员邮箱")
     password: str = Field(..., min_length=6, max_length=50, description="密码")
     phone: Optional[str] = Field(None, max_length=20, description="手机号")
-    role: Optional[AdminRole] = Field(AdminRole.ADMIN, description="管理员角色")
+
     
     @field_validator('username')
     @classmethod
@@ -41,7 +35,7 @@ class AdminUpdate(BaseModel):
     username: Optional[str] = Field(None, min_length=1, max_length=50)
     email: Optional[EmailStr] = None
     phone: Optional[str] = Field(None, max_length=20)
-    role: Optional[AdminRole] = None
+
     
     @field_validator('username')
     @classmethod
@@ -80,7 +74,7 @@ class AdminOut(BaseModel):
     username: str
     email: str
     phone: Optional[str]
-    role: AdminRole
+
     created_time: datetime
     updated_time: datetime
     last_login_time: Optional[datetime]
@@ -94,7 +88,7 @@ class AdminOut(BaseModel):
                 "username": "admin",
                 "email": "admin@example.com",
                 "phone": "13800138000",
-                "role": "admin",
+
                 "created_time": "2023-01-01T12:00:00",
                 "updated_time": "2023-01-01T12:00:00",
                 "last_login_time": "2023-01-01T12:00:00"
@@ -112,7 +106,7 @@ class AdminSearchParams(BaseModel):
     """管理员搜索参数模型"""
     username: Optional[str] = None
     email: Optional[str] = None
-    role: Optional[AdminRole] = None
+
     start_time: Optional[datetime] = None
     end_time: Optional[datetime] = None
 

@@ -1,10 +1,11 @@
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, or_
-from db.admin import Admin, AdminRole
+from db.admin import Admin
 from typing import List, Optional
 from passlib.context import CryptContext
 from datetime import datetime
 import logging
+import uuid
 
 logger = logging.getLogger(__name__)
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -17,11 +18,35 @@ def get_password_hash(password: str) -> str:
     """获取密码哈希"""
     return pwd_context.hash(password)
 
-def get_admin_by_id(db: Session, admin_id: int) -> Optional[Admin]:
-    """根据ID获取管理员"""
-    return db.query(Admin).filter(
-        and_(Admin.id == admin_id, Admin.is_del == 0)
-    ).first()
+def create_admin(db: Session, username: str, email: str, password: str, phone: Optional[str] = None) -> Admin:
+    """创建管理员"""
+    # 检查邮箱是否已存在
+    existing_admin_by_email = get_admin_by_email(db, email)
+    if existing_admin_by_email:
+        raise ValueError("邮箱已被注册")
+    
+    # 检查用户名是否已存在
+    existing_admin_by_username = get_admin_by_username(db, username)
+    if existing_admin_by_username:
+        raise ValueError("用户名已被使用")
+    
+    hashed_password = get_password_hash(password)
+    admin_uid = str(uuid.uuid4())
+    
+    db_admin = Admin(
+        uid=admin_uid,
+        username=username,
+        email=email,
+        password_hash=hashed_password,
+        phone=phone
+    )
+    
+    db.add(db_admin)
+    db.commit()
+    db.refresh(db_admin)
+    
+    logger.info(f"Admin created: {db_admin.username} ({db_admin.email})")
+    return db_admin
 
 def get_admin_by_email(db: Session, email: str) -> Optional[Admin]:
     """根据邮箱获取管理员"""
@@ -67,9 +92,9 @@ def authenticate_admin(db: Session, email: str, password: str) -> Optional[Admin
     logger.info(f"Admin authenticated: {admin.username} ({admin.email})")
     return admin
 
-def update_admin_last_login(db: Session, admin_id: int) -> bool:
+def update_admin_last_login(db: Session, admin_uid: str) -> bool:
     """更新管理员最后登录时间"""
-    admin = get_admin_by_id(db, admin_id)
+    admin = get_admin_by_uid(db, admin_uid)
     if not admin:
         return False
     
@@ -77,8 +102,24 @@ def update_admin_last_login(db: Session, admin_id: int) -> bool:
     db.commit()
     return True
 
-def get_admins_by_role(db: Session, role: AdminRole, skip: int = 0, limit: int = 20) -> List[Admin]:
-    """根据角色获取管理员列表"""
-    return db.query(Admin).filter(
-        and_(Admin.role == role, Admin.is_del == 0)
-    ).offset(skip).limit(limit).all()
+def search_admins(db: Session, username: Optional[str] = None, email: Optional[str] = None, phone: Optional[str] = None, admin_id: Optional[int] = None, skip: int = 0, limit: int = 20) -> tuple[List[Admin], int]:
+    """根据多个条件搜索管理员"""
+    query = db.query(Admin).filter(Admin.is_del == 0)
+    
+    if username:
+        query = query.filter(Admin.username.like(f"%{username}%"))
+    if email:
+        query = query.filter(Admin.email.like(f"%{email}%"))
+
+    if phone:
+        query = query.filter(Admin.phone.like(f"%{phone}%"))
+    if admin_id:
+        query = query.filter(Admin.id == admin_id)
+    
+    # 获取总数
+    total = query.count()
+    
+    # 分页查询
+    admins = query.offset(skip).limit(limit).all()
+    
+    return admins, total
