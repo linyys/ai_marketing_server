@@ -30,6 +30,7 @@ def create_copywriting_type(
     - prompt: 提示词
     - template: 模板
     - description: 描述
+    - icon: 图标
     """
     logger.info(f"尝试创建文案类型: {copywriting_type_data.name}")
     copywriting_type_data.updated_admin_uid = current_admin.uid
@@ -41,7 +42,7 @@ def create_copywriting_type(
 def get_copywriting_type(
     uid: str = Path(..., description="文案类型UID"),
     db: Session = Depends(get_db),
-    current_user = Depends(get_current_admin_or_user)
+    # current_user = Depends(get_current_admin_or_user)
 ):
     """
     根据UID获取文案类型信息
@@ -54,7 +55,7 @@ def get_copywriting_types_list(
     page: int = Query(1, ge=1, description="页码"),
     page_size: int = Query(20, ge=1, le=100, description="每页数量"),
     db: Session = Depends(get_db),
-    current_user = Depends(get_current_admin_or_user)
+    # current_user = Depends(get_current_admin_or_user)
 ):
     """
     获取文案类型列表（未删除）
@@ -98,6 +99,7 @@ def update_copywriting_type(
     - prompt: 提示词（可选）
     - template: 模板（可选）
     - description: 描述（可选）
+    - icon: 图标（可选）
     """
     logger.info(f"尝试更新文案类型: UID={uid}")
     # 设置更新管理员UID

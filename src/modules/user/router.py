@@ -10,7 +10,7 @@ from modules.user.controller import (
     get_users_list_service, update_user_service, delete_user_service,
     search_users_service, update_password_service
 )
-from utils.auth import get_current_user, get_current_admin
+from utils.auth import get_current_admin_or_user, get_current_user, get_current_admin
 import logging
 
 logger = logging.getLogger(__name__)
@@ -49,16 +49,16 @@ def get_users_list(
 def get_user(
     uid: str,
     db: Session = Depends(get_db),
-    current_user = Depends(get_current_user)
+    current_user = Depends(get_current_admin_or_user)
 ):
     """获取指定用户信息接口（管理员或本人可访问）"""
     # 检查权限：管理员或本人
-    try:
-        # 尝试获取管理员权限
-        from utils.auth import get_current_admin
-        admin = get_current_admin()
-        logger.info(f"管理员 {admin.username} 请求用户信息: {uid}")
-    except:
+    from db.admin import Admin
+    is_admin = isinstance(current_user, Admin)
+    
+    if is_admin:
+        logger.info(f"管理员 {current_user.username} 请求用户信息: {uid}")
+    else:
         # 非管理员，检查是否为本人
         if uid != current_user.uid:
             logger.warning(f"用户 {current_user.uid} 尝试访问其他用户信息: {uid}")

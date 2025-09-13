@@ -1,205 +1,178 @@
-from typing import Dict, TypedDict
+from typing import Dict, List, TypedDict
 
 class WorkflowInfo(TypedDict):
     """工作流信息结构"""
-    function: str  # 工作流功能
-    name: str      # 工作流名称
-    is_streaming: bool  # 是否流式传输
+    workflow_id: str   # 工作流ID
+    name: str          # 工作流名称
+    is_streaming: bool # 是否流式传输
 
 class WorkflowConfig:
     """
     工作流配置统一管理类
-    使用统一的键值对结构管理所有工作流配置
+    使用工作流功能作为键的统一配置结构
     """
     
-    # 统一的工作流配置映射表
+    # 以工作流功能为键的配置映射表
     WORKFLOWS: Dict[str, WorkflowInfo] = {
-        "7543079212585009195": {
-            "function": "copywriting",
-            "name": "文案生成",
+        "copywriting_create": {
+            "workflow_id": "7548632031845728291",
+            "name": "文案创作",
             "is_streaming": True
+        },
+        "prompt_generate": {
+            "workflow_id": "7548335440656662571",
+            "name": "提示词生成",
+            "is_streaming": False
         }
     }
     
     @classmethod
-    def get_workflow_info(cls, workflow_id: str) -> WorkflowInfo:
+    def get_workflow_info(cls, function: str) -> WorkflowInfo:
         """
-        获取工作流信息
+        根据工作流功能获取工作流信息
         
         Args:
-            workflow_id: 工作流ID
-        
+            function: 工作流功能
+            
         Returns:
-            工作流信息
-        
-        Raises:
-            KeyError: 如果工作流ID不存在
-        """
-        if workflow_id not in cls.WORKFLOWS:
-            raise KeyError(f"未找到工作流ID: {workflow_id}")
-        return cls.WORKFLOWS[workflow_id]
-    
-    @classmethod
-    def get_workflow_by_function(cls, function: str) -> tuple[str, WorkflowInfo]:
-        """
-        根据功能获取工作流ID和信息
-        
-        Args:
-            function: 工作流功能名称
-        
-        Returns:
-            (工作流ID, 工作流信息)
-        
+            WorkflowInfo: 工作流信息
+            
         Raises:
             KeyError: 如果功能不存在
         """
-        for workflow_id, info in cls.WORKFLOWS.items():
-            if info["function"] == function:
-                return workflow_id, info
-        raise KeyError(f"未找到功能: {function}")
+        if function not in cls.WORKFLOWS:
+            raise KeyError(f"未找到功能: {function}")
+        return cls.WORKFLOWS[function]
     
     @classmethod
-    def get_workflow_name(cls, workflow_id: str) -> str:
+    def get_workflow_id(cls, function: str) -> str:
         """
-        获取工作流显示名称
+        根据功能获取工作流ID
         
         Args:
-            workflow_id: 工作流ID
-        
+            function: 工作流功能
+            
         Returns:
-            工作流显示名称
+            str: 工作流ID
+            
+        Raises:
+            KeyError: 如果功能不存在
         """
-        info = cls.get_workflow_info(workflow_id)
+        info = cls.get_workflow_info(function)
+        return info["workflow_id"]
+    
+    @classmethod
+    def get_workflow_name(cls, function: str) -> str:
+        """
+        根据工作流功能获取工作流名称
+        
+        Args:
+            function: 工作流功能
+            
+        Returns:
+            str: 工作流名称
+        """
+        info = cls.get_workflow_info(function)
         return info["name"]
     
     @classmethod
-    def is_streaming_workflow(cls, workflow_id: str) -> bool:
+    def is_streaming_workflow(cls, function: str) -> bool:
         """
-        判断是否为流式传输工作流
+        判断工作流是否为流式传输
         
         Args:
-            workflow_id: 工作流ID
-        
+            function: 工作流功能
+            
         Returns:
-            是否为流式传输工作流
+            bool: 是否为流式传输
         """
-        info = cls.get_workflow_info(workflow_id)
+        info = cls.get_workflow_info(function)
         return info["is_streaming"]
     
     @classmethod
-    def get_all_workflow_ids(cls) -> list[str]:
+    def get_all_functions(cls) -> List[str]:
         """
-        获取所有工作流ID
+        获取所有工作流功能
         
         Returns:
-            工作流ID列表
+            List[str]: 所有工作流功能列表
         """
         return list(cls.WORKFLOWS.keys())
     
     @classmethod
-    def get_streaming_workflow_ids(cls) -> list[str]:
+    def get_streaming_functions(cls) -> List[str]:
         """
-        获取所有流式传输工作流ID
+        获取所有流式传输工作流功能
         
         Returns:
-            流式传输工作流ID列表
+            List[str]: 流式传输工作流功能列表
         """
-        return [workflow_id for workflow_id, info in cls.WORKFLOWS.items() if info["is_streaming"]]
+        return [function for function, info in cls.WORKFLOWS.items() 
+                if info["is_streaming"]]
     
     @classmethod
-    def get_non_streaming_workflow_ids(cls) -> list[str]:
+    def get_non_streaming_functions(cls) -> List[str]:
         """
-        获取所有非流式传输工作流ID
+        获取所有非流式传输工作流功能
         
         Returns:
-            非流式传输工作流ID列表
+            List[str]: 非流式传输工作流功能列表
         """
-        return [workflow_id for workflow_id, info in cls.WORKFLOWS.items() if not info["is_streaming"]]
+        return [function for function, info in cls.WORKFLOWS.items() 
+                if not info["is_streaming"]]
     
-    @classmethod
-    def get_workflows_by_function(cls, function: str) -> list[tuple[str, WorkflowInfo]]:
-        """
-        根据功能获取所有匹配的工作流
-        
-        Args:
-            function: 工作流功能名称
-        
-        Returns:
-            匹配的工作流列表 [(工作流ID, 工作流信息)]
-        """
-        return [(workflow_id, info) for workflow_id, info in cls.WORKFLOWS.items() if info["function"] == function]
-
-
-# 便捷访问实例
-workflow_config = WorkflowConfig()
-
-
 # 便捷函数
+def get_workflow_id(function: str) -> str:
+    """
+    根据功能获取工作流ID
+    
+    Args:
+        function: 工作流功能
+        
+    Returns:
+        str: 工作流ID
+    """
+    return WorkflowConfig.get_workflow_id(function)
+
+def get_workflow_info(function: str) -> WorkflowInfo:
+    """
+    根据功能获取工作流信息
+    
+    Args:
+        function: 工作流功能
+        
+    Returns:
+        WorkflowInfo: 工作流信息
+    """
+    return WorkflowConfig.get_workflow_info(function)
+
+def get_workflow_name(function: str) -> str:
+    """
+    根据功能获取工作流名称
+    
+    Args:
+        function: 工作流功能
+        
+    Returns:
+        str: 工作流名称
+    """
+    return WorkflowConfig.get_workflow_name(function)
+
+def is_streaming_workflow(function: str) -> bool:
+    """
+    根据功能判断是否为流式传输工作流
+    
+    Args:
+        function: 工作流功能
+        
+    Returns:
+        bool: 是否为流式传输
+    """
+    return WorkflowConfig.is_streaming_workflow(function)
+
+# 向后兼容函数
 def get_workflow_id_by_function(function: str) -> str:
     """
-    根据功能获取工作流ID的便捷函数
-    
-    Args:
-        function: 工作流功能名称
-    
-    Returns:
-        工作流ID
+    @deprecated 请使用 get_workflow_id
     """
-    workflow_id, _ = WorkflowConfig.get_workflow_by_function(function)
-    return workflow_id
-
-
-def get_workflow_info(workflow_id: str) -> WorkflowInfo:
-    """
-    获取工作流信息的便捷函数
-    
-    Args:
-        workflow_id: 工作流ID
-    
-    Returns:
-        工作流信息
-    """
-    return WorkflowConfig.get_workflow_info(workflow_id)
-
-
-def get_workflow_name(workflow_id: str) -> str:
-    """
-    获取工作流名称的便捷函数
-    
-    Args:
-        workflow_id: 工作流ID
-    
-    Returns:
-        工作流显示名称
-    """
-    return WorkflowConfig.get_workflow_name(workflow_id)
-
-
-def is_streaming_workflow(workflow_id: str) -> bool:
-    """
-    判断是否为流式传输工作流的便捷函数
-    
-    Args:
-        workflow_id: 工作流ID
-    
-    Returns:
-        是否为流式传输工作流
-    """
-    return WorkflowConfig.is_streaming_workflow(workflow_id)
-
-
-# 向后兼容的函数（已废弃，建议使用新的API）
-def get_workflow_id(workflow_key: str) -> str:
-    """
-    获取工作流ID的便捷函数（已废弃）
-    
-    Args:
-        workflow_key: 工作流功能名称
-    
-    Returns:
-        工作流ID
-    
-    Deprecated:
-        请使用 get_workflow_id_by_function 替代
-    """
-    return get_workflow_id_by_function(workflow_key)
+    return get_workflow_id(function)

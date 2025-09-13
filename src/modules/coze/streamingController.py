@@ -1,7 +1,7 @@
 from fastapi import Request
 import httpx
 from utils import config, http_request
-from utils.workflow_config import get_workflow_id_by_function
+from utils.workflow_config import get_workflow_id
 from typing import TypedDict
 
 
@@ -12,7 +12,6 @@ _header = {
     "Content-Type": "application/json",
 }
 _post = http_request.create_post(_base_url, _header)
-
 
 async def forward_sse(request: Request, workflow_id: str, params: dict):
     body = {"workflow_id": workflow_id, "parameters": params}
@@ -57,7 +56,14 @@ async def forward_sse(request: Request, workflow_id: str, params: dict):
 class _test(TypedDict):
     input: str
 async def test(request: Request, params: _test):
-    return forward_sse(request, get_workflow_id_by_function("test"), params)
+    return forward_sse(request, get_workflow_id("test"), params)
+
+class _copywriting_create(TypedDict):
+    prompt: str
+    content: str
+
+async def copywriting_create(request: Request, params: _copywriting_create):
+    return forward_sse(request, get_workflow_id("copywriting_create"), params)
 
 
 

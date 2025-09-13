@@ -14,6 +14,7 @@ def create_copywriting_type(
     prompt: str,
     template: str,
     description: str,
+    icon: str,
     updated_admin_uid: str
 ) -> CopywritingTypes:
     """创建文案类型"""
@@ -30,6 +31,7 @@ def create_copywriting_type(
         prompt=prompt,
         template=template,
         description=description,
+        icon=icon,
         updated_admin_uid=updated_admin_uid
     )
     
@@ -77,7 +79,8 @@ def update_copywriting_type(
     name: Optional[str] = None,
     prompt: Optional[str] = None,
     template: Optional[str] = None,
-    description: Optional[str] = None
+    description: Optional[str] = None,
+    icon: Optional[str] = None
 ) -> Optional[CopywritingTypes]:
     """更新文案类型"""
     copywriting_type = get_copywriting_type_by_uid(db, uid)
@@ -97,6 +100,8 @@ def update_copywriting_type(
         copywriting_type.template = template
     if description is not None:
         copywriting_type.description = description
+    if icon is not None:
+        copywriting_type.icon = icon
     
     copywriting_type.updated_admin_uid = updated_admin_uid
     copywriting_type.updated_time = datetime.now()

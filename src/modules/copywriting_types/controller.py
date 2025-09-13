@@ -26,6 +26,7 @@ def create_copywriting_type_service(
             prompt=copywriting_type_data.prompt,
             template=copywriting_type_data.template,
             description=copywriting_type_data.description,
+            icon=copywriting_type_data.icon,
             updated_admin_uid=copywriting_type_data.updated_admin_uid
         )
         return CopywritingTypeOut.model_validate(copywriting_type)
@@ -101,7 +102,8 @@ def update_copywriting_type_service(
             name=copywriting_type_data.name,
             prompt=copywriting_type_data.prompt,
             template=copywriting_type_data.template,
-            description=copywriting_type_data.description
+            description=copywriting_type_data.description,
+            icon=copywriting_type_data.icon
         )
         
         if not copywriting_type:

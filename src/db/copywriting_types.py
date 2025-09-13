@@ -14,3 +14,4 @@ class CopywritingTypes(Base):
     prompt = Column(String(255), nullable=False, comment='提示词')
     template = Column(String(255), nullable=False, comment='模板')
     description = Column(String(255), nullable=False, comment='描述')
+    icon = Column(String(15), nullable=False, comment='图标')

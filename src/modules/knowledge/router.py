@@ -129,16 +129,13 @@ def update_knowledge(
 ):
     """更新知识库接口（管理员或所有者可更新）"""
     # 检查权限：管理员或知识库所有者
-    try:
-        # 尝试获取管理员权限
-        admin = get_current_admin()
-        is_admin = True
-        current_user_uid = admin.uid
-        logger.info(f"管理员 {admin.username} 更新知识库 {uid}")
-    except:
-        # 非管理员，需要在service层检查是否为知识库所有者
-        is_admin = False
-        current_user_uid = current_user.uid
+    from db.admin import Admin
+    is_admin = isinstance(current_user, Admin)
+    current_user_uid = current_user.uid
+    
+    if is_admin:
+        logger.info(f"管理员 {current_user.username} 更新知识库 {uid}")
+    else:
         logger.info(f"用户 {current_user_uid} 更新知识库 {uid}")
     
     return update_knowledge_service(db, uid, knowledge_data, current_user_uid, is_admin)
@@ -151,16 +148,13 @@ def delete_knowledge(
 ):
     """删除知识库接口（管理员或所有者可删除）"""
     # 检查权限：管理员或知识库所有者
-    try:
-        # 尝试获取管理员权限
-        admin = get_current_admin()
-        is_admin = True
-        current_user_uid = admin.uid
-        logger.info(f"管理员 {admin.username} 删除知识库 {uid}")
-    except:
-        # 非管理员，需要在service层检查是否为知识库所有者
-        is_admin = False
-        current_user_uid = current_user.uid
+    from db.admin import Admin
+    is_admin = isinstance(current_user, Admin)
+    current_user_uid = current_user.uid
+    
+    if is_admin:
+        logger.info(f"管理员 {current_user.username} 删除知识库 {uid}")
+    else:
         logger.info(f"用户 {current_user_uid} 删除知识库 {uid}")
     
     return delete_knowledge_service(db, uid, current_user_uid, is_admin)

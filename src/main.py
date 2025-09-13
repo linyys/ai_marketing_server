@@ -14,10 +14,6 @@ from fastapi.responses import JSONResponse, HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pathlib import Path
-from modules.admin.router import router as admin_router
-from modules.copywriting_types.router import router as copywriting_type_router
-from modules.user.router import router as user_router
-from modules.knowledge.router import router as knowledge_router
 from utils.exceptions import BaseAPIException, format_error_response
 
 # 配置日志
@@ -134,23 +130,24 @@ async def log_requests(request: Request, call_next):
             f"Error: {str(e)}"
         )
         raise
-# 注册管理员模块路由
+from modules.admin.router import router as admin_router
+from modules.copywriting_types.router import router as copywriting_type_router
+from modules.user.router import router as user_router
+from modules.knowledge.router import router as knowledge_router
+from modules.coze.router import router as coze_router
 app.include_router(admin_router, prefix="/api")
-# 注册文案类型路由
 app.include_router(copywriting_type_router, prefix="/api")
-# 注册用户路由
 app.include_router(user_router, prefix="/api")
-# 注册知识库路由
 app.include_router(knowledge_router, prefix="/api")
-
+app.include_router(coze_router, prefix="/api")
 
 # 挂载静态文件目录
 BASE_DIR = Path(__file__).resolve().parent
 
-# 挂载resource目录（原有的静态资源）
+# 静态资源
 app.mount("/static", StaticFiles(directory=BASE_DIR / "resource"), name="static")
 
-# 挂载新的uploads目录（用户上传的文件）
+# 用户上传的文件
 uploads_dir = BASE_DIR / "uploads"
 uploads_dir.mkdir(exist_ok=True)  # 确保目录存在
 app.mount("/uploads", StaticFiles(directory=uploads_dir), name="uploads")

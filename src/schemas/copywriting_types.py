@@ -8,9 +8,10 @@ class CopywritingTypeCreate(BaseModel):
     prompt: str = Field(..., min_length=1, max_length=255, description="提示词")
     template: str = Field(..., min_length=1, max_length=255, description="模板")
     description: str = Field(..., min_length=1, max_length=255, description="描述")
+    icon: str = Field(..., min_length=1, max_length=15, description="图标")
     updated_admin_uid: str = Field(..., description="更新管理员ID")
 
-    @field_validator('name', 'prompt', 'template', 'description')
+    @field_validator('name', 'prompt', 'template', 'description', 'icon')
     @classmethod
     def validate_not_empty(cls, v: str) -> str:
         v = v.strip()
@@ -24,9 +25,10 @@ class CopywritingTypeUpdate(BaseModel):
     prompt: Optional[str] = Field(None, min_length=1, max_length=255, description="提示词")
     template: Optional[str] = Field(None, min_length=1, max_length=255, description="模板")
     description: Optional[str] = Field(None, min_length=1, max_length=255, description="描述")
+    icon: Optional[str] = Field(None, min_length=1, max_length=15, description="图标")
     updated_admin_uid: str = Field(..., description="更新管理员ID")
 
-    @field_validator('name', 'prompt', 'template', 'description')
+    @field_validator('name', 'prompt', 'template', 'description', 'icon')
     @classmethod
     def validate_not_empty(cls, v: Optional[str]) -> Optional[str]:
         if v is not None:
@@ -43,6 +45,7 @@ class CopywritingTypeOut(BaseModel):
     prompt: str
     template: str
     description: str
+    icon: str
     updated_admin_uid: str
     is_del: int
     created_time: datetime
