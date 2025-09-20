@@ -14,6 +14,7 @@ def create_copywriting_type(
     prompt: str,
     template: str,
     description: str,
+    template_type: int,
     icon: str,
     updated_admin_uid: str
 ) -> CopywritingTypes:
@@ -31,6 +32,7 @@ def create_copywriting_type(
         prompt=prompt,
         template=template,
         description=description,
+        template_type=template_type,
         icon=icon,
         updated_admin_uid=updated_admin_uid
     )
@@ -80,6 +82,7 @@ def update_copywriting_type(
     prompt: Optional[str] = None,
     template: Optional[str] = None,
     description: Optional[str] = None,
+    template_type: Optional[int] = None,
     icon: Optional[str] = None
 ) -> Optional[CopywritingTypes]:
     """更新文案类型"""
@@ -100,6 +103,8 @@ def update_copywriting_type(
         copywriting_type.template = template
     if description is not None:
         copywriting_type.description = description
+    if template_type is not None:
+        copywriting_type.template_type = template_type
     if icon is not None:
         copywriting_type.icon = icon
     
@@ -130,6 +135,7 @@ def soft_delete_copywriting_type(db: Session, uid: str, updated_admin_uid: str) 
 def search_copywriting_types(
     db: Session,
     name: Optional[str] = None,
+    template_type: Optional[int] = None,
     is_del: Optional[int] = None,
     start_time: Optional[datetime] = None,
     end_time: Optional[datetime] = None,
@@ -147,6 +153,9 @@ def search_copywriting_types(
     
     if name:
         query = query.filter(CopywritingTypes.name.like(f"%{name}%"))
+    
+    if template_type is not None:
+        query = query.filter(CopywritingTypes.template_type == template_type)
     
     if start_time:
         query = query.filter(CopywritingTypes.created_time >= start_time)

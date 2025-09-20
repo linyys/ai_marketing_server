@@ -5,7 +5,7 @@ from datetime import datetime
 class KnowledgeCreate(BaseModel):
     """创建知识库请求模型"""
     name: str = Field(..., min_length=1, max_length=50, description="名称")
-    content: str = Field(..., min_length=1, max_length=255, description="内容")
+    content: str = Field(..., min_length=1, description="内容")
     description: str = Field(..., min_length=1, max_length=255, description="描述")
     
     @field_validator('name')
@@ -35,7 +35,7 @@ class KnowledgeCreate(BaseModel):
 class KnowledgeUpdate(BaseModel):
     """更新知识库请求模型"""
     name: Optional[str] = Field(None, min_length=1, max_length=50, description="名称")
-    content: Optional[str] = Field(None, min_length=1, max_length=255, description="内容")
+    content: Optional[str] = Field(None, min_length=1, description="内容")
     description: Optional[str] = Field(None, min_length=1, max_length=255, description="描述")
     
     @field_validator('name')
@@ -111,3 +111,14 @@ class PaginationParams(BaseModel):
     """分页参数模型"""
     skip: int = Field(0, ge=0, description="跳过记录数")
     limit: int = Field(20, ge=1, le=100, description="返回记录数限制")
+
+class KnowledgeUidListResponse(BaseModel):
+    """知识库UID列表响应模型"""
+    knowledge_uids: List[str] = Field(..., description="知识库UID列表")
+    
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "knowledge_uids": ["550e8400-e29b-41d4-a716-446655440000", "660e8400-e29b-41d4-a716-446655440001"]
+            }
+        }

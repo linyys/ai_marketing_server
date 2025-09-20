@@ -8,6 +8,7 @@ class CopywritingTypeCreate(BaseModel):
     prompt: str = Field(..., min_length=1, max_length=255, description="提示词")
     template: str = Field(..., min_length=1, max_length=255, description="模板")
     description: str = Field(..., min_length=1, max_length=255, description="描述")
+    template_type: int = Field(0, ge=0, le=1, description="模板类型：0-文案生成模板 1-文案优化模板")
     icon: str = Field(..., min_length=1, max_length=15, description="图标")
     updated_admin_uid: str = Field(..., description="更新管理员ID")
 
@@ -25,6 +26,7 @@ class CopywritingTypeUpdate(BaseModel):
     prompt: Optional[str] = Field(None, min_length=1, max_length=255, description="提示词")
     template: Optional[str] = Field(None, min_length=1, max_length=255, description="模板")
     description: Optional[str] = Field(None, min_length=1, max_length=255, description="描述")
+    template_type: Optional[int] = Field(None, ge=0, le=1, description="模板类型：0-文案生成模板 1-文案优化模板")
     icon: Optional[str] = Field(None, min_length=1, max_length=15, description="图标")
     updated_admin_uid: str = Field(..., description="更新管理员ID")
 
@@ -45,6 +47,7 @@ class CopywritingTypeOut(BaseModel):
     prompt: str
     template: str
     description: str
+    template_type: int
     icon: str
     updated_admin_uid: str
     is_del: int
@@ -61,6 +64,7 @@ class CopywritingTypeOut(BaseModel):
                 "prompt": "请为以下产品写一段介绍文案",
                 "template": "产品名称：{product_name}\n产品特点：{features}",
                 "description": "用于生成产品介绍的文案模板",
+                "template_type": 0,
                 "updated_admin_uid": "admin-uid-123",
                 "is_del": 0,
                 "created_time": "2023-01-01T12:00:00",
@@ -78,6 +82,7 @@ class CopywritingTypeListResponse(BaseModel):
 class CopywritingTypeSearchParams(BaseModel):
     """文案类型搜索参数模型"""
     name: Optional[str] = Field(None, description="名称")
+    template_type: Optional[int] = Field(None, ge=0, le=1, description="模板类型：0-文案生成模板 1-文案优化模板")
     is_del: Optional[int] = Field(None, description="是否删除：0-未删除，1-已删除")
     start_time: Optional[datetime] = Field(None, description="创建时间开始")
     end_time: Optional[datetime] = Field(None, description="创建时间结束")

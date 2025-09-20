@@ -45,6 +45,15 @@ def get_users_list(
     logger.info(f"管理员 {current_admin.username} 请求用户列表")
     return get_users_list_service(db, skip, limit)
 
+@router.get("/get/me", response_model=UserOut, summary="获取当前用户信息")
+def get_current_user_info(
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user)
+):
+    """获取当前用户信息接口（根据token获取）"""
+    logger.info(f"用户 {current_user.uid} 请求自己的信息")
+    return get_user_service(db, current_user.uid)
+
 @router.get("/get/{uid}", response_model=UserOut, summary="获取指定用户信息")
 def get_user(
     uid: str,

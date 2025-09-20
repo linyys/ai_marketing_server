@@ -26,6 +26,7 @@ def create_copywriting_type_service(
             prompt=copywriting_type_data.prompt,
             template=copywriting_type_data.template,
             description=copywriting_type_data.description,
+            template_type=copywriting_type_data.template_type,
             icon=copywriting_type_data.icon,
             updated_admin_uid=copywriting_type_data.updated_admin_uid
         )
@@ -103,6 +104,7 @@ def update_copywriting_type_service(
             prompt=copywriting_type_data.prompt,
             template=copywriting_type_data.template,
             description=copywriting_type_data.description,
+            template_type=copywriting_type_data.template_type,
             icon=copywriting_type_data.icon
         )
         
@@ -165,11 +167,12 @@ def search_copywriting_types_service(
         copywriting_types, total = search_copywriting_types(
             db=db,
             name=search_params.name,
+            template_type=search_params.template_type,
             is_del=search_params.is_del,
             start_time=search_params.start_time,
             end_time=search_params.end_time,
-            skip=skip,
-            limit=limit
+            skip=search_params.skip,
+            limit=search_params.limit
         )
         
         items = [CopywritingTypeOut.model_validate(ct) for ct in copywriting_types]

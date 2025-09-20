@@ -30,6 +30,7 @@ def create_copywriting_type(
     - prompt: 提示词
     - template: 模板
     - description: 描述
+    - template_type: 模板类型（0-文案生成模板，1-文案优化模板）
     - icon: 图标
     """
     logger.info(f"尝试创建文案类型: {copywriting_type_data.name}")
@@ -76,6 +77,7 @@ def search_copywriting_types(
     根据多个条件搜索文案类型
     
     - name: 名称（模糊搜索）
+    - template_type: 模板类型（0-文案生成模板，1-文案优化模板）
     - is_del: 是否删除（0-未删除，1-已删除）
     - start_time: 创建时间开始
     - end_time: 创建时间结束
@@ -99,6 +101,7 @@ def update_copywriting_type(
     - prompt: 提示词（可选）
     - template: 模板（可选）
     - description: 描述（可选）
+    - template_type: 模板类型（可选，0-文案生成模板，1-文案优化模板）
     - icon: 图标（可选）
     """
     logger.info(f"尝试更新文案类型: UID={uid}")

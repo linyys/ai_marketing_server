@@ -135,11 +135,13 @@ from modules.copywriting_types.router import router as copywriting_type_router
 from modules.user.router import router as user_router
 from modules.knowledge.router import router as knowledge_router
 from modules.coze.router import router as coze_router
+from modules.robot.router import router as robot_router
 app.include_router(admin_router, prefix="/api")
 app.include_router(copywriting_type_router, prefix="/api")
 app.include_router(user_router, prefix="/api")
 app.include_router(knowledge_router, prefix="/api")
 app.include_router(coze_router, prefix="/api")
+app.include_router(robot_router, prefix="/api")
 
 # 挂载静态文件目录
 BASE_DIR = Path(__file__).resolve().parent

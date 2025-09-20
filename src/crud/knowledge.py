@@ -1,6 +1,7 @@
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, or_
-from db.knowledges import Knowledge
+from db.knowledges import Knowledges
+from db.robots_knowledges_relations import RobotsKnowledgesRelations
 from typing import List, Optional
 from datetime import datetime
 import logging
@@ -8,7 +9,7 @@ import uuid
 
 logger = logging.getLogger(__name__)
 
-def create_knowledge(db: Session, name: str, content: str, description: str, from_user: Optional[str] = None) -> Knowledge:
+def create_knowledge(db: Session, name: str, content: str, description: str, from_user: Optional[str] = None) -> Knowledges:
     """创建知识库"""
     # 检查名称是否已存在
     existing_knowledge = get_knowledge_by_name(db, name)
@@ -16,7 +17,7 @@ def create_knowledge(db: Session, name: str, content: str, description: str, fro
         raise ValueError("知识库名称已存在")
     
     try:
-        db_knowledge = Knowledge(
+        db_knowledge = Knowledges(
             uid=str(uuid.uuid4()),
             name=name,
             content=content,
@@ -34,60 +35,60 @@ def create_knowledge(db: Session, name: str, content: str, description: str, fro
         logger.error(f"创建知识库失败: {str(e)}")
         raise ValueError(f"创建知识库失败: {str(e)}")
 
-def get_knowledge_by_name(db: Session, name: str) -> Optional[Knowledge]:
+def get_knowledge_by_name(db: Session, name: str) -> Optional[Knowledges]:
     """根据名称获取知识库"""
-    return db.query(Knowledge).filter(and_(Knowledge.name == name, Knowledge.is_del == 0)).first()
+    return db.query(Knowledges).filter(and_(Knowledges.name == name, Knowledges.is_del == 0)).first()
 
-def get_knowledge_by_uid(db: Session, uid: str) -> Optional[Knowledge]:
+def get_knowledge_by_uid(db: Session, uid: str) -> Optional[Knowledges]:
     """根据UID获取知识库"""
-    return db.query(Knowledge).filter(and_(Knowledge.uid == uid, Knowledge.is_del == 0)).first()
+    return db.query(Knowledges).filter(and_(Knowledges.uid == uid, Knowledges.is_del == 0)).first()
 
-def get_knowledges(db: Session, skip: int = 0, limit: int = 20) -> List[Knowledge]:
+def get_knowledges(db: Session, skip: int = 0, limit: int = 20) -> List[Knowledges]:
     """获取知识库列表"""
-    return db.query(Knowledge).filter(Knowledge.is_del == 0).offset(skip).limit(limit).all()
+    return db.query(Knowledges).filter(Knowledges.is_del == 0).offset(skip).limit(limit).all()
 
 def get_knowledges_count(db: Session) -> int:
     """获取知识库总数"""
-    return db.query(Knowledge).filter(Knowledge.is_del == 0).count()
+    return db.query(Knowledges).filter(Knowledges.is_del == 0).count()
 
-def get_knowledges_by_user(db: Session, user_uid: str, skip: int = 0, limit: int = 20) -> List[Knowledge]:
+def get_knowledges_by_user(db: Session, user_uid: str, skip: int = 0, limit: int = 20) -> List[Knowledges]:
     """获取指定用户的知识库列表"""
-    return db.query(Knowledge).filter(
-        and_(Knowledge.from_user == user_uid, Knowledge.is_del == 0)
+    return db.query(Knowledges).filter(
+        and_(Knowledges.from_user == user_uid, Knowledges.is_del == 0)
     ).offset(skip).limit(limit).all()
 
 def get_knowledges_by_user_count(db: Session, user_uid: str) -> int:
     """获取指定用户的知识库总数"""
-    return db.query(Knowledge).filter(
-        and_(Knowledge.from_user == user_uid, Knowledge.is_del == 0)
+    return db.query(Knowledges).filter(
+        and_(Knowledges.from_user == user_uid, Knowledges.is_del == 0)
     ).count()
 
-def get_public_knowledges(db: Session, skip: int = 0, limit: int = 20) -> List[Knowledge]:
+def get_public_knowledges(db: Session, skip: int = 0, limit: int = 20) -> List[Knowledges]:
     """获取公共知识库列表（from_user为空）"""
-    return db.query(Knowledge).filter(
-        and_(Knowledge.from_user.is_(None), Knowledge.is_del == 0)
+    return db.query(Knowledges).filter(
+        and_(Knowledges.from_user.is_(None), Knowledges.is_del == 0)
     ).offset(skip).limit(limit).all()
 
-def get_user_accessible_knowledges(db: Session, user_uid: str, skip: int = 0, limit: int = 20) -> List[Knowledge]:
+def get_user_accessible_knowledges(db: Session, user_uid: str, skip: int = 0, limit: int = 20) -> List[Knowledges]:
     """获取用户可访问的知识库列表（自己的+公共的）"""
-    return db.query(Knowledge).filter(
+    return db.query(Knowledges).filter(
         and_(
-            or_(Knowledge.from_user == user_uid, Knowledge.from_user.is_(None)),
-            Knowledge.is_del == 0
+            or_(Knowledges.from_user == user_uid, Knowledges.from_user.is_(None)),
+            Knowledges.is_del == 0
         )
     ).offset(skip).limit(limit).all()
 
 def get_user_accessible_knowledges_count(db: Session, user_uid: str) -> int:
     """获取用户可访问的知识库总数"""
-    return db.query(Knowledge).filter(
+    return db.query(Knowledges).filter(
         and_(
-            or_(Knowledge.from_user == user_uid, Knowledge.from_user.is_(None)),
-            Knowledge.is_del == 0
+            or_(Knowledges.from_user == user_uid, Knowledges.from_user.is_(None)),
+            Knowledges.is_del == 0
         )
     ).count()
 
 def update_knowledge(db: Session, knowledge_uid: str, name: Optional[str] = None, 
-                    content: Optional[str] = None, description: Optional[str] = None) -> Optional[Knowledge]:
+                    content: Optional[str] = None, description: Optional[str] = None) -> Optional[Knowledges]:
     """更新知识库"""
     try:
         db_knowledge = get_knowledge_by_uid(db, knowledge_uid)
@@ -143,22 +144,22 @@ def delete_knowledge(db: Session, knowledge_uid: str) -> bool:
 def search_knowledges(db: Session, name: Optional[str] = None, content: Optional[str] = None, 
                      description: Optional[str] = None, from_user: Optional[str] = None,
                      start_time: Optional[datetime] = None, end_time: Optional[datetime] = None,
-                     skip: int = 0, limit: int = 20) -> tuple[List[Knowledge], int]:
+                     skip: int = 0, limit: int = 20) -> tuple[List[Knowledges], int]:
     """搜索知识库"""
-    query = db.query(Knowledge).filter(Knowledge.is_del == 0)
+    query = db.query(Knowledges).filter(Knowledges.is_del == 0)
     
     if name:
-        query = query.filter(Knowledge.name.like(f"%{name}%"))
+        query = query.filter(Knowledges.name.like(f"%{name}%"))
     if content:
-        query = query.filter(Knowledge.content.like(f"%{content}%"))
+        query = query.filter(Knowledges.content.like(f"%{content}%"))
     if description:
-        query = query.filter(Knowledge.description.like(f"%{description}%"))
+        query = query.filter(Knowledges.description.like(f"%{description}%"))
     if from_user:
-        query = query.filter(Knowledge.from_user == from_user)
+        query = query.filter(Knowledges.from_user == from_user)
     if start_time:
-        query = query.filter(Knowledge.created_time >= start_time)
+        query = query.filter(Knowledges.created_time >= start_time)
     if end_time:
-        query = query.filter(Knowledge.created_time <= end_time)
+        query = query.filter(Knowledges.created_time <= end_time)
     
     total = query.count()
     knowledges = query.offset(skip).limit(limit).all()
@@ -168,32 +169,32 @@ def search_knowledges(db: Session, name: Optional[str] = None, content: Optional
 def search_user_accessible_knowledges(db: Session, user_uid: str, name: Optional[str] = None, 
                                      content: Optional[str] = None, description: Optional[str] = None,
                                      start_time: Optional[datetime] = None, end_time: Optional[datetime] = None,
-                                     skip: int = 0, limit: int = 20) -> tuple[List[Knowledge], int]:
+                                     skip: int = 0, limit: int = 20) -> tuple[List[Knowledges], int]:
     """搜索用户可访问的知识库"""
-    query = db.query(Knowledge).filter(
+    query = db.query(Knowledges).filter(
         and_(
-            or_(Knowledge.from_user == user_uid, Knowledge.from_user.is_(None)),
-            Knowledge.is_del == 0
+            or_(Knowledges.from_user == user_uid, Knowledges.from_user.is_(None)),
+            Knowledges.is_del == 0
         )
     )
     
     if name:
-        query = query.filter(Knowledge.name.like(f"%{name}%"))
+        query = query.filter(Knowledges.name.like(f"%{name}%"))
     if content:
-        query = query.filter(Knowledge.content.like(f"%{content}%"))
+        query = query.filter(Knowledges.content.like(f"%{content}%"))
     if description:
-        query = query.filter(Knowledge.description.like(f"%{description}%"))
+        query = query.filter(Knowledges.description.like(f"%{description}%"))
     if start_time:
-        query = query.filter(Knowledge.created_time >= start_time)
+        query = query.filter(Knowledges.created_time >= start_time)
     if end_time:
-        query = query.filter(Knowledge.created_time <= end_time)
+        query = query.filter(Knowledges.created_time <= end_time)
     
     total = query.count()
     knowledges = query.offset(skip).limit(limit).all()
     
     return knowledges, total
 
-def check_knowledge_permission(db: Session, knowledge_uid: str, user_uid: str) -> tuple[bool, Optional[Knowledge]]:
+def check_knowledge_permission(db: Session, knowledge_uid: str, user_uid: str) -> tuple[bool, Optional[Knowledges]]:
     """检查用户对知识库的权限"""
     knowledge = get_knowledge_by_uid(db, knowledge_uid)
     if not knowledge:
@@ -209,3 +210,20 @@ def check_knowledge_permission(db: Session, knowledge_uid: str, user_uid: str) -
     
     # 其他情况无权限
     return False, knowledge
+
+def get_knowledge_uids_by_robot_uid(db: Session, robot_uid: str) -> List[str]:
+    """根据机器人UID获取关联的知识库ID列表"""
+    try:
+        relations = db.query(RobotsKnowledgesRelations).filter(
+            and_(
+                RobotsKnowledgesRelations.robot_uid == robot_uid,
+                RobotsKnowledgesRelations.is_del == 0
+            )
+        ).all()
+        
+        knowledge_ids = [relation.knowledge_uid for relation in relations]
+        logger.info(f"机器人 {robot_uid} 关联的知识库数量: {len(knowledge_ids)}")
+        return knowledge_ids
+    except Exception as e:
+        logger.error(f"获取机器人 {robot_uid} 的知识库ID列表失败: {str(e)}")
+        return []

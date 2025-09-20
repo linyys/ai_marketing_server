@@ -3,12 +3,12 @@ from sqlalchemy.orm import Session
 from db.database import get_db
 from schemas.knowledge import (
     KnowledgeCreate, KnowledgeUpdate, KnowledgeOut, KnowledgeListResponse,
-    KnowledgeSearchParams, PaginationParams
+    KnowledgeSearchParams, PaginationParams, KnowledgeUidListResponse
 )
 from modules.knowledge.controller import (
     create_knowledge_service, get_knowledge_service, get_knowledges_list_service,
     get_user_knowledges_service, update_knowledge_service, delete_knowledge_service,
-    search_knowledges_service
+    search_knowledges_service, get_knowledge_uids_by_robot_service
 )
 from utils.auth import get_current_user, get_current_admin, get_current_admin_or_user
 from typing import Optional
@@ -158,3 +158,22 @@ def delete_knowledge(
         logger.info(f"用户 {current_user_uid} 删除知识库 {uid}")
     
     return delete_knowledge_service(db, uid, current_user_uid, is_admin)
+
+@router.get("/get_by_robot/{uid}", response_model=KnowledgeUidListResponse, summary="根据机器人UID获取知识库UID列表")
+def get_knowledge_uids_by_robot(
+    uid: str,
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_admin_or_user)
+):
+    """根据机器人UID获取关联的知识库ID列表接口（管理员和用户都可访问）"""
+    # 检查权限：管理员或普通用户
+    from db.admin import Admin
+    is_admin = isinstance(current_user, Admin)
+    current_user_uid = current_user.uid
+    
+    if is_admin:
+        logger.info(f"管理员 {current_user.username} 请求机器人 {uid} 的知识库ID列表")
+    else:
+        logger.info(f"用户 {current_user_uid} 请求机器人 {uid} 的知识库ID列表")
+    
+    return get_knowledge_uids_by_robot_service(db, uid, current_user_uid, is_admin)

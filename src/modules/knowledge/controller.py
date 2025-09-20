@@ -11,6 +11,7 @@ from crud.knowledge import (
     delete_knowledge,
     search_knowledges,
     search_user_accessible_knowledges,
+    get_knowledge_uids_by_robot_uid,
 )
 from schemas.knowledge import (
     KnowledgeCreate,
@@ -19,6 +20,7 @@ from schemas.knowledge import (
     KnowledgeListResponse,
     KnowledgeSearchParams,
     PaginationParams,
+    KnowledgeUidListResponse,
 )
 from typing import List
 import logging
@@ -316,4 +318,24 @@ def search_knowledges_service(
         logger.error(f"搜索知识库异常: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="搜索知识库失败"
+        )
+
+def get_knowledge_uids_by_robot_service(
+    db: Session, robot_uid: str, current_user_uid: str = None, is_admin: bool = False
+) -> KnowledgeUidListResponse:
+    """
+    根据机器人UID获取关联的知识库UID列表服务
+    """
+    try:
+        logger.info(f"获取机器人 {robot_uid} 的知识库UID列表")
+        
+        knowledge_uids = get_knowledge_uids_by_robot_uid(db, robot_uid)
+        
+        return KnowledgeUidListResponse(knowledge_uids=knowledge_uids)
+        
+    except Exception as e:
+        logger.error(f"获取机器人知识库ID列表异常: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, 
+            detail="获取机器人知识库ID列表失败"
         )

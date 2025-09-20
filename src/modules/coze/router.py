@@ -18,13 +18,30 @@ streaming_headers = {
     "X-Accel-Buffering": "no",  # 禁用Nginx缓冲
 }
 
-@router.post("/copywriting_create")
-async def copywriting_create(params: controller._copywriting_create) -> controller.WorkflowResponse:
-    return await controller.copywriting_create(params)
+
+@router.post("/streaming/copywriting_create")
+async def copywriting_create(
+    request: Request, 
+    prompt: str = Form(...),
+    content: str = Form(...)
+) -> controller.WorkflowResponse:
+    params = {"prompt": prompt, "content": content}
+    return StreamingResponse(
+        streamingController.forward_sse(
+            request, streamingController.get_workflow_id("copywriting_create"), params
+        ),
+        headers=streaming_headers,
+    )
+
 
 @router.post("/prompt_generate")
-async def prompt_generate(params: controller._prompt_generate) -> controller.WorkflowResponse:
+async def prompt_generate(
+    prompt_template: str = Form(...),
+    requirement: str = Form(...)
+) -> controller.WorkflowResponse:
+    params = {"prompt_template": prompt_template, "requirement": requirement}
     return await controller.prompt_generate(params)
+
 
 @router.get("/query_workflow")
 async def query_workflow(task_id: str) -> dict:
