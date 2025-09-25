@@ -285,6 +285,53 @@ def get_robot_filter_by_robot_uid(db: Session, robot_uid: str) -> Optional[Robot
         and_(RobotFilters.robot_uid == robot_uid, RobotFilters.is_del == 0)
     ).first()
 
+def update_robot_filter(db: Session, robot_uid: str, filter_type: Optional[int] = None,
+                       is_filter_groups: Optional[bool] = None,
+                       is_filter_private: Optional[bool] = None,
+                       is_filter_members: Optional[bool] = None,
+                       whitelist_content: Optional[List[str]] = None,
+                       blacklist_content: Optional[List[str]] = None,
+                       whitelist_names: Optional[List[str]] = None,
+                       blacklist_names: Optional[List[str]] = None) -> Optional[RobotFilters]:
+    """更新机器人过滤规则"""
+    try:
+        # 检查机器人是否存在
+        robot = get_robot_by_uid(db, robot_uid)
+        if not robot:
+            raise ValueError("机器人不存在")
+        
+        # 获取现有过滤规则
+        robot_filter = get_robot_filter_by_robot_uid(db, robot_uid)
+        if not robot_filter:
+            raise ValueError("过滤规则不存在")
+        
+        # 更新字段
+        if filter_type is not None:
+            robot_filter.filter_type = filter_type
+        if is_filter_groups is not None:
+            robot_filter.is_filter_groups = 1 if is_filter_groups else 0
+        if is_filter_private is not None:
+            robot_filter.is_filter_private = 1 if is_filter_private else 0
+        if is_filter_members is not None:
+            robot_filter.is_filter_members = 1 if is_filter_members else 0
+        if whitelist_content is not None:
+            robot_filter.whitelist_content = json.dumps(whitelist_content) if whitelist_content else None
+        if blacklist_content is not None:
+            robot_filter.blacklist_content = json.dumps(blacklist_content) if blacklist_content else None
+        if whitelist_names is not None:
+            robot_filter.whitelist_names = json.dumps(whitelist_names) if whitelist_names else None
+        if blacklist_names is not None:
+            robot_filter.blacklist_names = json.dumps(blacklist_names) if blacklist_names else None
+        
+        db.commit()
+        db.refresh(robot_filter)
+        logger.info(f"机器人过滤规则更新成功: {robot_filter.uid}")
+        return robot_filter
+    except Exception as e:
+        db.rollback()
+        logger.error(f"更新过滤规则失败: {str(e)}")
+        raise ValueError(f"更新过滤规则失败: {str(e)}")
+
 def get_robot_knowledges(db: Session, robot_uid: str) -> List[str]:
     """获取机器人绑定的知识库UID列表"""
     relations = db.query(RobotsKnowledgesRelations).filter(

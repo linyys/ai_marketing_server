@@ -176,6 +176,25 @@ class RobotFilterCreate(BaseModel):
             raise ValueError('过滤类型值无效')
         return v
 
+class RobotFilterUpdate(BaseModel):
+    """更新机器人过滤规则请求模型"""
+    robot_uid: str = Field(..., description="机器人UID")
+    filter_type: Optional[int] = Field(None, ge=0, le=2, description="过滤类型：0-黑名单 1-白名单 2-先通过白名单再过滤黑名单")
+    is_filter_groups: Optional[bool] = Field(None, description="是否过滤群聊")
+    is_filter_private: Optional[bool] = Field(None, description="是否过滤私聊")
+    is_filter_members: Optional[bool] = Field(None, description="是否过滤群成员")
+    whitelist_content: Optional[List[str]] = Field(None, description="白名单内容")
+    blacklist_content: Optional[List[str]] = Field(None, description="黑名单内容")
+    whitelist_names: Optional[List[str]] = Field(None, description="白名单名称")
+    blacklist_names: Optional[List[str]] = Field(None, description="黑名单名称")
+    
+    @field_validator('filter_type')
+    @classmethod
+    def validate_filter_type(cls, v: Optional[int]) -> Optional[int]:
+        if v is not None and v not in [0, 1, 2]:
+            raise ValueError('过滤类型值无效')
+        return v
+
 class RobotFilterOut(BaseModel):
     """机器人过滤规则输出模型"""
     id: int

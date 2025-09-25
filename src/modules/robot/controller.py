@@ -15,6 +15,7 @@ from crud.robot import (
     add_robot_knowledges,
     create_robot_filter,
     get_robot_filter_by_robot_uid,
+    update_robot_filter,
     get_robot_knowledges
 )
 from crud.knowledge import get_knowledge_by_uid
@@ -27,6 +28,7 @@ from schemas.robot import (
     RobotDeleteRequest,
     RobotAddKnowledgeRequest,
     RobotFilterCreate,
+    RobotFilterUpdate,
     RobotFilterOut
 )
 from typing import List
@@ -531,23 +533,23 @@ def add_robot_filter_service(db: Session, filter_data: RobotFilterCreate,
             )
         
         # 验证过滤规则的内容要求
-        if filter_data.filter_type == 0 and not filter_data.blacklist_content:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="黑名单模式必须提供黑名单内容"
-            )
+        # if filter_data.filter_type == 0 and not filter_data.blacklist_content:
+        #     raise HTTPException(
+        #         status_code=status.HTTP_400_BAD_REQUEST,
+        #         detail="黑名单模式必须提供黑名单内容"
+        #     )
         
-        if filter_data.filter_type == 1 and not filter_data.whitelist_content:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="白名单模式必须提供白名单内容"
-            )
+        # if filter_data.filter_type == 1 and not filter_data.whitelist_content:
+        #     raise HTTPException(
+        #         status_code=status.HTTP_400_BAD_REQUEST,
+        #         detail="白名单模式必须提供白名单内容"
+        #     )
         
-        if filter_data.filter_type == 2 and (not filter_data.whitelist_content or not filter_data.blacklist_content):
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="混合模式必须同时提供白名单和黑名单内容"
-            )
+        # if filter_data.filter_type == 2 and (not filter_data.whitelist_content or not filter_data.blacklist_content):
+        #     raise HTTPException(
+        #         status_code=status.HTTP_400_BAD_REQUEST,
+        #         detail="混合模式必须同时提供白名单和黑名单内容"
+        #     )
         
         robot_filter = create_robot_filter(
             db=db,
@@ -578,4 +580,115 @@ def add_robot_filter_service(db: Session, filter_data: RobotFilterCreate,
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="添加过滤规则失败"
+        )
+
+def update_robot_filter_service(db: Session, filter_data: RobotFilterUpdate,
+                               current_user_uid: str) -> RobotFilterOut:
+    """
+    更新机器人过滤规则服务
+    
+    Args:
+        db: 数据库会话
+        filter_data: 过滤规则更新数据
+        current_user_uid: 当前用户UID
+    
+    Returns:
+        更新后的过滤规则信息
+    
+    Raises:
+        HTTPException: 更新失败时抛出异常
+    """
+    try:
+        # 检查机器人权限
+        has_permission, robot = check_robot_permission(db, filter_data.robot_uid, current_user_uid)
+        if not has_permission:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="无权限操作此机器人"
+            )
+        
+        if not robot:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="机器人不存在"
+            )
+        
+        robot_filter = update_robot_filter(
+            db=db,
+            robot_uid=filter_data.robot_uid,
+            filter_type=filter_data.filter_type,
+            is_filter_groups=filter_data.is_filter_groups,
+            is_filter_private=filter_data.is_filter_private,
+            is_filter_members=filter_data.is_filter_members,
+            whitelist_content=filter_data.whitelist_content,
+            blacklist_content=filter_data.blacklist_content,
+            whitelist_names=filter_data.whitelist_names,
+            blacklist_names=filter_data.blacklist_names
+        )
+        
+        logger.info(f"机器人 {filter_data.robot_uid} 更新过滤规则成功")
+        return RobotFilterOut.model_validate(robot_filter)
+    
+    except HTTPException:
+        raise
+    except ValueError as e:
+        logger.error(f"更新过滤规则失败: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+    except Exception as e:
+        logger.error(f"更新过滤规则异常: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="更新过滤规则失败"
+        )
+
+def get_robot_filter_service(db: Session, robot_uid: str, current_user_uid: str) -> RobotFilterOut:
+    """
+    获取机器人过滤规则服务
+    
+    Args:
+        db: 数据库会话
+        robot_uid: 机器人UID
+        current_user_uid: 当前用户UID
+    
+    Returns:
+        过滤规则信息
+    
+    Raises:
+        HTTPException: 获取失败时抛出异常
+    """
+    try:
+        # 检查机器人权限
+        has_permission, robot = check_robot_permission(db, robot_uid, current_user_uid)
+        if not has_permission:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="无权限操作此机器人"
+            )
+        
+        if not robot:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="机器人不存在"
+            )
+        
+        robot_filter = get_robot_filter_by_robot_uid(db, robot_uid)
+        if not robot_filter:
+            raise HTTPException(
+                status_code=status.HTTP_200_OK,
+                detail="过滤规则不存在"
+            )
+        
+        logger.info(f"获取机器人 {robot_uid} 过滤规则成功")
+        return RobotFilterOut.model_validate(robot_filter)
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"获取过滤规则异常: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="获取过滤规则失败"
         )

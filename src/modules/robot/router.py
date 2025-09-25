@@ -10,7 +10,9 @@ from modules.robot.controller import (
     update_robot_service,
     delete_robot_service,
     add_robot_knowledge_service,
-    add_robot_filter_service
+    add_robot_filter_service,
+    update_robot_filter_service,
+    get_robot_filter_service
 )
 from schemas.robot import (
     RobotCreate,
@@ -21,7 +23,9 @@ from schemas.robot import (
     RobotDeleteRequest,
     RobotAddKnowledgeRequest,
     RobotFilterCreate,
-    RobotFilterOut
+    RobotFilterUpdate,
+    RobotFilterOut,
+    PaginationParams
 )
 import logging
 
@@ -231,3 +235,46 @@ def add_robot_filter(
     """
     logger.info(f"用户 {current_user.uid} 为机器人 {filter_data.robot_uid} 添加过滤规则")
     return add_robot_filter_service(db, filter_data, current_user.uid)
+
+@router.post("/edit/filter", response_model=RobotFilterOut, summary="修改过滤规则")
+def edit_robot_filter(
+    filter_data: RobotFilterUpdate,
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user)
+):
+    """
+    修改机器人过滤规则接口（用户权限）
+    
+    - 只能修改自己的机器人过滤规则
+    - 可以部分更新过滤规则字段
+    
+    参数：
+    - **robot_uid**: 机器人UID
+    - **filter_type**: 过滤类型（0-黑名单 1-白名单 2-混合模式，可选）
+    - **is_filter_groups**: 是否过滤群聊（可选）
+    - **is_filter_private**: 是否过滤私聊（可选）
+    - **is_filter_members**: 是否过滤群成员（可选）
+    - **whitelist_content**: 白名单内容（可选）
+    - **blacklist_content**: 黑名单内容（可选）
+    - **whitelist_names**: 白名单名称（可选）
+    - **blacklist_names**: 黑名单名称（可选）
+    """
+    logger.info(f"用户 {current_user.uid} 修改机器人 {filter_data.robot_uid} 过滤规则")
+    return update_robot_filter_service(db, filter_data, current_user.uid)
+
+@router.get("/get/filter/{uid}", response_model=RobotFilterOut, summary="查询过滤规则")
+def get_robot_filter(
+    uid: str = Path(..., description="机器人UID"),
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user)
+):
+    """
+    查询机器人过滤规则接口（用户权限）
+    
+    - 只能查询自己的机器人过滤规则
+    
+    参数：
+    - **uid**: 机器人UID
+    """
+    logger.info(f"用户 {current_user.uid} 查询机器人 {uid} 过滤规则")
+    return get_robot_filter_service(db, uid, current_user.uid)
