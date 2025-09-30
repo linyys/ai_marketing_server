@@ -67,27 +67,27 @@ class KnowledgeUpdate(BaseModel):
 
 class KnowledgeOut(BaseModel):
     """知识库输出模型"""
+    id: int
     uid: str
-    is_del: bool
-    created_time: datetime
-    updated_time: datetime
-    from_user: str
     name: str
     content: str
     description: str
+    from_user: Optional[str]
+    created_time: datetime
+    updated_time: datetime
     
     class Config:
         from_attributes = True
         json_schema_extra = {
             "example": {
+                "id": 1,
                 "uid": "550e8400-e29b-41d4-a716-446655440000",
-                "is_del": False,
-                "created_time": "2023-01-01T12:00:00",
-                "updated_time": "2023-01-01T12:00:00",
-                "from_user": "user-uid-123",
                 "name": "产品介绍",
-                "content": "这是我们的主要产品...",
-                "description": "产品相关知识库"
+                "content": "这是一个优秀的产品...",
+                "description": "产品相关知识库",
+                "from_user": "user-uid-123",
+                "created_time": "2023-01-01T12:00:00",
+                "updated_time": "2023-01-01T12:00:00"
             }
         }
 
