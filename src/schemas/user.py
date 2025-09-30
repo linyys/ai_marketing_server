@@ -69,12 +69,10 @@ class UserLogin(BaseModel):
 
 class UserOut(BaseModel):
     """用户输出模型"""
-    id: int
     uid: str
     username: str
     email: str
     phone: Optional[str]
-
     created_time: datetime
     updated_time: datetime
     last_login_time: Optional[datetime]
@@ -83,7 +81,6 @@ class UserOut(BaseModel):
         from_attributes = True
         json_schema_extra = {
             "example": {
-                "id": 1,
                 "uid": "550e8400-e29b-41d4-a716-446655440000",
                 "username": "张三",
                 "email": "zhangsan@example.com",

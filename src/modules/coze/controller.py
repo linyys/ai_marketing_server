@@ -66,6 +66,13 @@ async def prompt_generate(params: _prompt_generate) -> WorkflowResponse:
     workflow_id = get_workflow_id("prompt_generate")
     return await base_workflow(workflow_id, params)
 
+class _video_to_text(TypedDict):
+    video_url: str
+
+async def video_to_text(params: _video_to_text) -> WorkflowResponse:
+    workflow_id = get_workflow_id("video_to_text")
+    return await base_workflow(workflow_id, params)
+
 _query_base_url = "https://api.coze.cn/v1/workflows"
 _get = http_request.create_get(_query_base_url, _header)
 

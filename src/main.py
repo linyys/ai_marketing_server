@@ -136,12 +136,14 @@ from modules.user.router import router as user_router
 from modules.knowledge.router import router as knowledge_router
 from modules.coze.router import router as coze_router
 from modules.robot.router import router as robot_router
+from modules.douyin.router import router as douyin_router
 app.include_router(admin_router, prefix="/api")
 app.include_router(copywriting_type_router, prefix="/api")
 app.include_router(user_router, prefix="/api")
 app.include_router(knowledge_router, prefix="/api")
 app.include_router(coze_router, prefix="/api")
 app.include_router(robot_router, prefix="/api")
+app.include_router(douyin_router, prefix="/api")
 
 # 挂载静态文件目录
 BASE_DIR = Path(__file__).resolve().parent
@@ -202,10 +204,9 @@ def welcome():
 
 if __name__ == "__main__":
     import uvicorn
-
     dev = "127.0.0.1"
     pre = "192.168.0.44"
-
+    
     uvicorn.run(
         "main:app",
         host=pre,

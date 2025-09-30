@@ -69,12 +69,10 @@ class AdminLogin(BaseModel):
 
 class AdminOut(BaseModel):
     """管理员输出模型"""
-    id: int
     uid: str
     username: str
     email: str
     phone: Optional[str]
-
     created_time: datetime
     updated_time: datetime
     last_login_time: Optional[datetime]
@@ -83,12 +81,10 @@ class AdminOut(BaseModel):
         from_attributes = True
         json_schema_extra = {
             "example": {
-                "id": 1,
                 "uid": "550e8400-e29b-41d4-a716-446655440000",
                 "username": "admin",
                 "email": "admin@example.com",
                 "phone": "13800138000",
-
                 "created_time": "2023-01-01T12:00:00",
                 "updated_time": "2023-01-01T12:00:00",
                 "last_login_time": "2023-01-01T12:00:00"

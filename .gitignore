@@ -8,3 +8,4 @@ file
 .trae
 .pytest_cache
 **/*.db
+other

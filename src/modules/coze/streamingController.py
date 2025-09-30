@@ -2,7 +2,7 @@ from fastapi import Request
 import httpx
 from utils import config, http_request
 from utils.workflow_config import get_workflow_id
-from typing import TypedDict
+from typing import TypedDict, List
 
 
 _token = config.config.get("coze", "token")
@@ -64,6 +64,25 @@ class _copywriting_create(TypedDict):
 
 async def copywriting_create(request: Request, params: _copywriting_create):
     return forward_sse(request, get_workflow_id("copywriting_create"), params)
+
+
+class _video_analysis_item(TypedDict):
+    desc: str
+    tag_name: List[str]
+    digg_count: int
+    comment_count: int
+    share_count: int
+    collect_count: int
+    recommend_count: int
+    play_count: int
+
+
+class _video_market_analysis(TypedDict):
+    input: List[_video_analysis_item]
+
+
+async def video_market_analysis(request: Request, params: _video_market_analysis):
+    return forward_sse(request, get_workflow_id("video_market_analysis"), params)
 
 
 

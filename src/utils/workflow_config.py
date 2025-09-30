@@ -23,6 +23,16 @@ class WorkflowConfig:
             "workflow_id": "7548335440656662571",
             "name": "提示词生成",
             "is_streaming": False
+        },
+        "video_market_analysis": {
+            "workflow_id": "7545291455734005806",
+            "name": "个人主页内容分析",
+            "is_streaming": True
+        },
+        "video_to_text": {
+            "workflow_id": "7517866010540654646",
+            "name": "视频转文字",
+            "is_streaming": False
         }
     }
     

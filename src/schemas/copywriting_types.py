@@ -41,7 +41,6 @@ class CopywritingTypeUpdate(BaseModel):
 
 class CopywritingTypeOut(BaseModel):
     """文案类型输出模型"""
-    id: int
     uid: str
     name: str
     prompt: str
@@ -50,7 +49,7 @@ class CopywritingTypeOut(BaseModel):
     template_type: int
     icon: str
     updated_admin_uid: str
-    is_del: int
+    is_del: bool
     created_time: datetime
     updated_time: datetime
 
@@ -58,17 +57,17 @@ class CopywritingTypeOut(BaseModel):
         from_attributes = True
         json_schema_extra = {
             "example": {
-                "id": 1,
                 "uid": "550e8400-e29b-41d4-a716-446655440000",
-                "name": "产品介绍文案",
-                "prompt": "请为以下产品写一段介绍文案",
-                "template": "产品名称：{product_name}\n产品特点：{features}",
-                "description": "用于生成产品介绍的文案模板",
-                "template_type": 0,
+                "name": "营销文案",
+                "prompt": "请生成一段营销文案",
+                "template": "{{product_name}}是一款优秀的产品...",
+                "description": "用于生成营销文案的模板",
+                "template_type": 1,
                 "updated_admin_uid": "admin-uid-123",
-                "is_del": 0,
+                "is_del": False,
                 "created_time": "2023-01-01T12:00:00",
-                "updated_time": "2023-01-01T12:00:00"
+                "updated_time": "2023-01-01T12:00:00",
+                "icon": "marketing.svg"
             }
         }
 

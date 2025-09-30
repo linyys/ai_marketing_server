@@ -87,7 +87,6 @@ class RobotUpdate(BaseModel):
 
 class RobotOut(BaseModel):
     """机器人输出模型"""
-    id: int
     uid: str
     name: str
     reply_type: int
@@ -107,7 +106,6 @@ class RobotOut(BaseModel):
         from_attributes = True
         json_schema_extra = {
             "example": {
-                "id": 1,
                 "uid": "550e8400-e29b-41d4-a716-446655440000",
                 "name": "客服机器人",
                 "reply_type": 3,
@@ -197,7 +195,6 @@ class RobotFilterUpdate(BaseModel):
 
 class RobotFilterOut(BaseModel):
     """机器人过滤规则输出模型"""
-    id: int
     uid: str
     filter_type: int
     is_filter_groups: Optional[bool]
