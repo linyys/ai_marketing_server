@@ -16,7 +16,8 @@ def create_scheduled_task(
     description: str,
     platform: int,
     time_cron: str,
-    is_system: int = 0
+    is_system: int = 0,
+    one_time: int = 0
 ) -> ScheduledTask:
     """创建定时任务"""
     try:
@@ -30,7 +31,8 @@ def create_scheduled_task(
             description=description,
             platform=platform,
             time_cron=time_cron,
-            is_system=is_system
+            is_system=is_system,
+            one_time=one_time
         )
         
         db.add(db_task)
@@ -97,7 +99,7 @@ def update_scheduled_task(
     description: Optional[str] = None,
     platform: Optional[int] = None,
     time_cron: Optional[str] = None,
-    is_enable: Optional[int] = None
+    is_system: Optional[int] = None
 ) -> Optional[ScheduledTask]:
     """更新定时任务"""
     try:
@@ -115,8 +117,8 @@ def update_scheduled_task(
             task.platform = platform
         if time_cron is not None:
             task.time_cron = time_cron
-        if is_enable is not None:
-            task.is_enable = is_enable
+        if is_system is not None:
+            task.is_system = is_system
         
         task.updated_time = datetime.now()
         
@@ -153,7 +155,7 @@ def search_scheduled_tasks(
     db: Session,
     name: Optional[str] = None,
     platform: Optional[int] = None,
-    is_enable: Optional[int] = None,
+    one_time: Optional[int] = None,
     from_user: Optional[str] = None,
     skip: int = 0,
     limit: int = 20
@@ -165,8 +167,8 @@ def search_scheduled_tasks(
         query = query.filter(ScheduledTask.name.like(f"%{name}%"))
     if platform is not None:
         query = query.filter(ScheduledTask.platform == platform)
-    if is_enable is not None:
-        query = query.filter(ScheduledTask.is_enable == is_enable)
+    if one_time is not None:
+        query = query.filter(ScheduledTask.one_time == one_time)
     if from_user:
         query = query.filter(ScheduledTask.from_user == from_user)
     
@@ -175,11 +177,8 @@ def search_scheduled_tasks(
     
     return tasks, total
 
-def get_enabled_scheduled_tasks(db: Session) -> List[ScheduledTask]:
-    """获取所有启用的定时任务"""
+def get_all_active_scheduled_tasks(db: Session) -> List[ScheduledTask]:
+    """获取所有活跃的定时任务（未删除）"""
     return db.query(ScheduledTask).filter(
-        and_(
-            ScheduledTask.is_del == 0,
-            ScheduledTask.is_enable == 1
-        )
+        ScheduledTask.is_del == 0
     ).all()

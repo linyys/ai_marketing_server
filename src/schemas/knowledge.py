@@ -7,6 +7,7 @@ class KnowledgeCreate(BaseModel):
     name: str = Field(..., min_length=1, max_length=50, description="名称")
     content: str = Field(..., min_length=1, description="内容")
     description: str = Field(..., min_length=1, max_length=255, description="描述")
+    type: int = Field(0, ge=0, le=1, description="类型：0-文字，1-文件")
     
     @field_validator('name')
     @classmethod
@@ -37,6 +38,7 @@ class KnowledgeUpdate(BaseModel):
     name: Optional[str] = Field(None, min_length=1, max_length=50, description="名称")
     content: Optional[str] = Field(None, min_length=1, description="内容")
     description: Optional[str] = Field(None, min_length=1, max_length=255, description="描述")
+    type: Optional[int] = Field(None, ge=0, le=1, description="类型：0-文字，1-文件")
     
     @field_validator('name')
     @classmethod
@@ -72,6 +74,7 @@ class KnowledgeOut(BaseModel):
     name: str
     content: str
     description: str
+    type: int
     from_user: Optional[str]
     created_time: datetime
     updated_time: datetime
@@ -85,6 +88,7 @@ class KnowledgeOut(BaseModel):
                 "name": "产品介绍",
                 "content": "这是一个优秀的产品...",
                 "description": "产品相关知识库",
+                "type": 0,
                 "from_user": "user-uid-123",
                 "created_time": "2023-01-01T12:00:00",
                 "updated_time": "2023-01-01T12:00:00"

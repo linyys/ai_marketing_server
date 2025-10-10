@@ -9,7 +9,7 @@ import uuid
 
 logger = logging.getLogger(__name__)
 
-def create_knowledge(db: Session, name: str, content: str, description: str, from_user: Optional[str] = None) -> Knowledges:
+def create_knowledge(db: Session, name: str, content: str, description: str, from_user: Optional[str] = None, type: int = 0) -> Knowledges:
     """创建知识库"""
     # 检查名称是否已存在
     existing_knowledge = get_knowledge_by_name(db, name)
@@ -23,6 +23,7 @@ def create_knowledge(db: Session, name: str, content: str, description: str, fro
             content=content,
             description=description,
             from_user=from_user,
+            type=type,
             is_del=0
         )
         db.add(db_knowledge)
@@ -88,7 +89,7 @@ def get_user_accessible_knowledges_count(db: Session, user_uid: str) -> int:
     ).count()
 
 def update_knowledge(db: Session, knowledge_uid: str, name: Optional[str] = None, 
-                    content: Optional[str] = None, description: Optional[str] = None) -> Optional[Knowledges]:
+                    content: Optional[str] = None, description: Optional[str] = None, type: Optional[int] = None) -> Optional[Knowledges]:
     """更新知识库"""
     try:
         db_knowledge = get_knowledge_by_uid(db, knowledge_uid)
@@ -109,6 +110,8 @@ def update_knowledge(db: Session, knowledge_uid: str, name: Optional[str] = None
             update_data['content'] = content
         if description is not None:
             update_data['description'] = description
+        if type is not None:
+            update_data['type'] = type
         
         if update_data:
             for key, value in update_data.items():

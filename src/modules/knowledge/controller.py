@@ -47,6 +47,7 @@ def create_knowledge_service(
             content=knowledge_data.content,
             description=knowledge_data.description,
             from_user=actual_from_user,
+            type=knowledge_data.type,
         )
 
         logger.info(f"知识库创建成功: {db_knowledge.uid}")
@@ -203,6 +204,7 @@ def update_knowledge_service(
             name=knowledge_data.name,
             content=knowledge_data.content,
             description=knowledge_data.description,
+            type=knowledge_data.type,
         )
 
         if not updated_knowledge:

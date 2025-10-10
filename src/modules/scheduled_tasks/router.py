@@ -127,33 +127,6 @@ def search_tasks(
     
     return search_scheduled_tasks_service(db, search_params, current_user.uid, is_admin, skip, limit)
 
-# 管理员专用的任务管理接口
-
-
-@router.post("/toggle/{task_uid}", response_model=ScheduledTaskOut, summary="切换任务启用状态")
-def toggle_task_status(
-    task_uid: str,
-    db: Session = Depends(get_db),
-    current_user_or_admin = Depends(get_current_admin_or_user)
-):
-    """切换任务启用状态接口（用户只能切换自己的任务，管理员可以切换所有任务）"""
-    is_admin = hasattr(current_user_or_admin, 'role') and current_user_or_admin.role == 'admin'
-    user_type = "管理员" if is_admin else "用户"
-    username = current_user_or_admin.username
-    
-    logger.info(f"{user_type} {username} 切换任务状态: {task_uid}")
-    
-    # 获取当前任务状态
-    task = get_scheduled_task_service(db, task_uid, current_user_or_admin.uid, is_admin)
-    
-    # 切换启用状态
-    from schemas.scheduled_tasks import ScheduledTaskEdit
-    edit_data = ScheduledTaskEdit(
-        uid=task_uid,
-        is_enable=1 - task.is_enable  # 0变1，1变0
-    )
-    
-    return update_scheduled_task_service(db, edit_data, current_user_or_admin.uid, is_admin)
 
 
 @router.post("/toggle-system/{task_uid}", response_model=ScheduledTaskOut, summary="切换任务系统级状态")

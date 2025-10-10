@@ -36,7 +36,8 @@ def create_scheduled_task_service(
             description=task_data.description,
             platform=task_data.platform,
             time_cron=task_data.time_cron,
-            is_system=task_data.is_system or 0
+            is_system=task_data.is_system or 0,
+            one_time=task_data.one_time or 0
         )
         return ScheduledTaskOut.model_validate(task)
     except ValueError as e:
@@ -154,8 +155,7 @@ def update_scheduled_task_service(
             content=task_data.content,
             description=task_data.description,
             platform=task_data.platform,
-            time_cron=task_data.time_cron,
-            is_enable=task_data.is_enable
+            time_cron=task_data.time_cron
         )
         
         if not updated_task:
@@ -244,7 +244,7 @@ def search_scheduled_tasks_service(
             db=db,
             name=search_params.name,
             platform=search_params.platform,
-            is_enable=search_params.is_enable,
+            one_time=search_params.one_time,
             from_user=from_user,
             skip=skip,
             limit=limit
@@ -304,13 +304,12 @@ def toggle_task_system_level_service(
         # 更新任务
         updated_task = update_scheduled_task(
             db=db,
-            task_uid=task_uid,
+            uid=task_uid,
             name=edit_data.name,
             content=edit_data.content,
             description=edit_data.description,
             platform=edit_data.platform,
             time_cron=edit_data.time_cron,
-            is_enable=edit_data.is_enable,
             is_system=edit_data.is_system
         )
         
