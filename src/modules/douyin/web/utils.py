@@ -3,6 +3,7 @@ import logging
 import random
 import string
 import time
+import re
 from urllib.parse import quote
 
 import httpx
@@ -110,3 +111,103 @@ class BogusManager:
             raise RuntimeError("生成A-Bogus失败: {0})".format(e))
 
         return quote(ab_value, safe='')
+
+
+class AwemeIdFetcher:
+    # 预编译正则表达式
+    _DOUYIN_VIDEO_URL_PATTERN = re.compile(r"video/([^/?]*)")
+    _DOUYIN_VIDEO_URL_PATTERN_NEW = re.compile(r"[?&]vid=(\\d+)")
+    _DOUYIN_NOTE_URL_PATTERN = re.compile(r"note/([^/?]*)")
+    _DOUYIN_DISCOVER_URL_PATTERN = re.compile(r"modal_id=([0-9]+)")
+
+    @classmethod
+    async def get_aweme_id(cls, url: str) -> str:
+        """
+        从单个url中获取aweme_id (Get aweme_id from a single url)
+
+        Args:
+            url (str): 输入的url (Input url)
+
+        Returns:
+            str: 匹配到的aweme_id (Matched aweme_id)
+        """
+
+        if not isinstance(url, str):
+            raise TypeError("参数必须是字符串类型")
+
+        # 重定向到完整链接
+        transport = httpx.AsyncHTTPTransport(retries=5)
+        async with httpx.AsyncClient(
+                transport=transport, proxy=None, timeout=10
+        ) as client:
+            try:
+                response = await client.get(url, follow_redirects=True)
+                response.raise_for_status()
+
+                response_url = str(response.url)
+
+                # 按顺序尝试匹配视频ID
+                for pattern in [
+                    cls._DOUYIN_VIDEO_URL_PATTERN,
+                    cls._DOUYIN_VIDEO_URL_PATTERN_NEW,
+                    cls._DOUYIN_NOTE_URL_PATTERN,
+                    cls._DOUYIN_DISCOVER_URL_PATTERN
+                ]:
+                    match = pattern.search(response_url)
+                    if match:
+                        return match.group(1)
+
+                raise APIResponseError("未在响应的地址中找到 aweme_id，检查链接是否为作品页")
+
+            except httpx.RequestError as exc:
+                raise APIConnectionError(
+                    f"请求端点失败，请检查当前网络环境。链接：{url}，代理：{TokenManager.proxies}，异常类名：{cls.__name__}，异常详细信息：{exc}"
+                )
+
+            except httpx.HTTPStatusError as e:
+                raise APIResponseError(
+                    f"链接：{e.response.url}，状态码 {e.response.status_code}：{e.response.text}"
+                )
+
+
+def generate_base_params() -> dict:
+    """生成抖音搜索基础参数"""
+    return {
+        "device_platform": "webapp",
+        "aid": "6383",
+        "channel": "channel_pc_web",
+        "support_h265": "0",
+        "support_dash": "0",
+        "cpu_core_num": "12",
+        "version_code": "170400",
+        "version_name": "17.4.0",
+        "cookie_enabled": "true",
+        "screen_width": "1536",
+        "screen_height": "864",
+        "browser_language": "zh-CN",
+        "browser_platform": "Win32",
+        "browser_name": "Edge",
+        "browser_version": "141.0.0.0",
+        "browser_online": "true",
+        "engine_name": "Blink",
+        "engine_version": "141.0.0.0",
+        "os_name": "Windows",
+        "os_version": "10",
+        "device_memory": "8",
+        "platform": "PC",
+        "downlink": "10",
+        "effective_type": "4g",
+        "round_trip_time": "50",
+    }
+
+
+def generate_webid() -> str:
+    """生成webid参数"""
+    import random
+    return str(random.randint(1000000000000000000, 9999999999999999999))
+
+
+def generate_uifid() -> str:
+    """生成uifid参数"""
+    import uuid
+    return uuid.uuid4().hex

@@ -2,6 +2,7 @@ from pydantic import BaseModel, Field
 from typing import Optional, List, Dict, Any
 from datetime import datetime
 
+
 class VideoDetailRequest(BaseModel):
     """获取单个视频详情请求模型"""
     aweme_id: str = Field(..., description="视频ID")
@@ -52,3 +53,7 @@ class DouyinErrorResponse(BaseModel):
     error_code: str = Field(..., description="错误代码")
     message: str = Field(..., description="错误消息")
     detail: Optional[str] = Field(None, description="错误详情")
+
+class SearchSuggestion(BaseModel):
+    """搜索建议项模型"""
+    content: str = Field(..., description="推荐的关键词内容")
