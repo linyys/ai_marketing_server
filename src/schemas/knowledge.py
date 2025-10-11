@@ -7,7 +7,7 @@ class KnowledgeCreate(BaseModel):
     name: str = Field(..., min_length=1, max_length=50, description="名称")
     content: str = Field(..., min_length=1, description="内容")
     description: str = Field(..., min_length=1, max_length=255, description="描述")
-    type: int = Field(0, ge=0, le=1, description="类型：0-文字，1-文件")
+    type: int = Field(..., ge=0, le=2, description="类型：0-文字，1-文件，2-外部")
     
     @field_validator('name')
     @classmethod
@@ -38,7 +38,7 @@ class KnowledgeUpdate(BaseModel):
     name: Optional[str] = Field(None, min_length=1, max_length=50, description="名称")
     content: Optional[str] = Field(None, min_length=1, description="内容")
     description: Optional[str] = Field(None, min_length=1, max_length=255, description="描述")
-    type: Optional[int] = Field(None, ge=0, le=1, description="类型：0-文字，1-文件")
+    type: Optional[int] = Field(None, ge=0, le=2, description="类型：0-文字，1-文件，2-外部")
     
     @field_validator('name')
     @classmethod

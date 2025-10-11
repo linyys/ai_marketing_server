@@ -9,7 +9,7 @@ import uuid
 
 logger = logging.getLogger(__name__)
 
-def create_knowledge(db: Session, name: str, content: str, description: str, from_user: Optional[str] = None, type: int = 0) -> Knowledges:
+def create_knowledge(db: Session, name: str, content: str, description: str, type: int, from_user: Optional[str] = None) -> Knowledges:
     """创建知识库"""
     # 检查名称是否已存在
     existing_knowledge = get_knowledge_by_name(db, name)
