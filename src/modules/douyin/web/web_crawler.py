@@ -1,6 +1,8 @@
 import asyncio
 import os
 from urllib.parse import urlencode
+from .abogus import ABogus
+from .utils import (AwemeIdFetcher, generate_base_params, generate_webid, generate_uifid)
 import yaml
 
 from modules.douyin.base_crawler import BaseCrawler
@@ -19,6 +21,11 @@ with open(f"{path}/config.yaml", "r", encoding="utf-8") as f:
 
 
 class DouyinWebCrawler:
+    def __init__(self):
+        self.headers = config["TokenManager"]["douyin"]["headers"]
+        self.proxies = config["TokenManager"]["douyin"]["proxies"]
+        self.session = BaseCrawler(proxies=self.proxies, crawler_headers=self.headers)
+        self.abogus = ABogus()
 
     async def get_douyin_headers(self):
         """获取抖音请求头配置"""
@@ -83,3 +90,42 @@ class DouyinWebCrawler:
             )
             response = await crawler.fetch_get_json(endpoint)
         return response
+
+    # 获取搜索关键词建议
+    async def get_search_suggestions(self, keyword: str):
+        """
+        获取抖音搜索关键词的推荐建议
+        
+        Args:
+            keyword: 搜索关键词
+            
+        Returns:
+            推荐词列表，格式: [{"content": "推荐词1", ...}, ...]
+        """
+        # 基础参数（复用现有生成方法）
+        params = generate_base_params()
+        params.update({
+            "keyword": keyword,
+            "source": "aweme_video_web",
+            "update_version_code": "170400",
+            "pc_client_type": "1",
+            "pc_libra_divert": "Windows",
+            "webid": generate_webid(),
+            "uifid": generate_uifid(),
+        })
+        
+        # 动态生成关键参数
+        params["a_bogus"] = self.abogus.get_value(params)
+        params["msToken"] = self._generate_ms_token()  # 可复用xbogus.py的逻辑
+        
+        # 发送请求
+        url = "https://www.douyin.com/aweme/v1/web/search/sug/?" + urlencode(params)
+        response = await self.session.fetch_get_json(url)
+        
+        # 解析响应
+        return response.get("sug_list", [])
+
+    def _generate_ms_token(self) -> str:
+        """复用TokenManager的token生成逻辑"""
+        from .utils import TokenManager
+        return TokenManager().gen_real_msToken()

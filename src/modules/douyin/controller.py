@@ -1,11 +1,12 @@
 import logging
-from typing import Any
+from typing import Any, List
 from fastapi import HTTPException, status
 
 from modules.douyin.web.web_crawler import DouyinWebCrawler
 from schemas.douyin import (
     VideoDetailResponse, UserVideosResponse, 
-    UserProfileResponse, VideoCommentsResponse
+    UserProfileResponse, VideoCommentsResponse,
+    SearchSuggestion
 )
 
 logger = logging.getLogger(__name__)
@@ -91,4 +92,18 @@ async def fetch_video_comments_service(aweme_id: str, cursor: int, count: int) -
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"获取视频评论失败: {str(e)}"
         )
-        
+
+async def fetch_search_suggestions_service(keyword: str) -> List[SearchSuggestion]:
+    """获取搜索建议服务"""
+    try:
+        logger.info(f"开始获取搜索建议，关键词: {keyword}")
+        suggestions_data = await _crawler.get_search_suggestions(keyword)
+        suggestions = [SearchSuggestion(content=item['content']) for item in suggestions_data]
+        logger.info(f"成功获取搜索建议，数量: {len(suggestions)}")
+        return suggestions
+    except Exception as e:
+        logger.error(f"获取搜索建议异常，关键词: {keyword}, 错误: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"获取搜索建议失败: {str(e)}"
+        )

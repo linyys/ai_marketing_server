@@ -1,13 +1,16 @@
 import logging
+from typing import List
 from fastapi import APIRouter, HTTPException, status, Query
 
 from modules.douyin.controller import (
     fetch_video_detail_service, fetch_user_videos_service,
-    fetch_user_profile_service, fetch_video_comments_service
+    fetch_user_profile_service, fetch_video_comments_service,
+    fetch_search_suggestions_service
 )
 from schemas.douyin import (
     VideoDetailResponse, UserVideosResponse,
-    UserProfileResponse, VideoCommentsResponse
+    UserProfileResponse, VideoCommentsResponse,
+    SearchSuggestion
 )
 
 logger = logging.getLogger(__name__)
@@ -52,3 +55,9 @@ async def get_video_comments(
     """获取抖音视频评论数据"""
     _validate_required_param(aweme_id, "aweme_id")
     return await fetch_video_comments_service(aweme_id, cursor, count)
+
+@router.get("/search/suggestions", response_model=List[SearchSuggestion], summary="获取搜索建议")
+async def get_search_suggestions(keyword: str = Query(..., description="搜索关键词")):
+    """根据关键词获取抖音搜索建议"""
+    _validate_required_param(keyword, "keyword")
+    return await fetch_search_suggestions_service(keyword)
