@@ -125,7 +125,59 @@ class DouyinWebCrawler:
         # 解析响应
         return response.get("sug_list", [])
 
+    async def search_videos(self, keyword: str, offset: int = 0, count: int = 16) -> dict:
+        """
+        搜索关键词相关视频，返回搜索结果（参数严格匹配实际请求）
+        
+        Args:
+            keyword: 搜索关键词
+            offset: 分页偏移量
+            count: 每页数量
+            
+        Returns:
+            搜索结果字典，包含视频列表等信息
+        """
+        # 获取抖音的实时Cookie和请求头
+        kwargs = await self.get_douyin_headers()
+        
+        # 构建搜索参数（完全匹配实际参数）
+        params = generate_base_params()
+        params.update({
+            "keyword": keyword,
+            "search_channel": "aweme_video_web",
+            "list_type": "single",
+            "search_source": "normal_search",
+            "offset": str(offset),
+            "count": str(count),
+            "webid": generate_webid(),
+            "uifid": generate_uifid(),
+        })
+        
+        # 生成a_bogus参数
+        params["a_bogus"] = self.abogus.get_value(params)
+        params["msToken"] = self._generate_ms_token()
+        
+        # 发送请求
+        url = DouyinAPIEndpoints.SEARCH_ITEM
+        async with BaseCrawler(proxies=kwargs["proxies"], crawler_headers=kwargs["headers"]) as crawler:
+            endpoint = f"{url}?{urlencode(params)}"
+            response = await crawler.fetch_get_json(endpoint)
+        
+        return response
+
+    def _get_search_headers(self, keyword: str) -> dict:
+        """生成搜索请求专用headers"""
+        referer = f"https://www.douyin.com/search/{quote(keyword)}?type=video"
+        return {
+            **self.headers,
+            "referer": referer,
+            "priority": "u=1, i",
+            "sec-fetch-dest": "empty",
+            "sec-fetch-mode": "cors",
+            "sec-fetch-site": "same-origin"
+        }
+
     def _generate_ms_token(self) -> str:
-        """复用TokenManager的token生成逻辑"""
-        from .utils import TokenManager
+        """生成msToken"""
+        from src.modules.douyin.web.utils import TokenManager
         return TokenManager().gen_real_msToken()

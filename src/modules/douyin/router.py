@@ -2,19 +2,24 @@ import logging
 from typing import List
 from fastapi import APIRouter, HTTPException, status, Query
 
-from modules.douyin.controller import (
-    fetch_video_detail_service, fetch_user_videos_service,
-    fetch_user_profile_service, fetch_video_comments_service,
+from src.schemas.douyin import DouyinSearchRequest
+from src.modules.douyin.controller import (
+    DouyinController,
+    fetch_video_detail_service,
+    fetch_user_videos_service,
+    fetch_user_profile_service,
+    fetch_video_comments_service,
     fetch_search_suggestions_service
 )
 from schemas.douyin import (
     VideoDetailResponse, UserVideosResponse,
     UserProfileResponse, VideoCommentsResponse,
-    SearchSuggestion
+    SearchSuggestion, DouyinSearchResponse
 )
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/douyin", tags=["抖音"])
+controller = DouyinController()
 
 def _validate_required_param(param_value: str, param_name: str) -> None:
     """验证必需参数"""
@@ -61,3 +66,18 @@ async def get_search_suggestions(keyword: str = Query(..., description="搜索�
     """根据关键词获取抖音搜索建议"""
     _validate_required_param(keyword, "keyword")
     return await fetch_search_suggestions_service(keyword)
+
+@router.get("/search/video", response_model=DouyinSearchResponse, summary="获取视频信息")
+async def search_video(
+    keyword: str = Query(..., description="搜索关键词"),
+    offset: int = Query(0, ge=0, description="分页偏移量"),
+    count: int = Query(16, ge=1, le=50, description="每页数量")
+):
+    """
+    搜索抖音视频
+    - **keyword**: 搜索关键词
+    - **offset**: 分页偏移量（默认0）
+    - **count**: 每页数量（1-50，默认16）
+    """
+    request = DouyinSearchRequest(keyword=keyword, offset=offset, count=count)
+    return await controller.search_videos(request)
