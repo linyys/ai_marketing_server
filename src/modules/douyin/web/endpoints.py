@@ -42,7 +42,7 @@ class DouyinAPIEndpoints:
     # 综合搜索 (General Search)
     GENERAL_SEARCH = f"{DOUYIN_DOMAIN}/aweme/v1/web/general/search/single/"
 
-    # 视频搜索 (Video Search)
+    # 抖音视频搜索接口 (Douyin Video Search)
     VIDEO_SEARCH = f"{DOUYIN_DOMAIN}/aweme/v1/web/search/item/"
 
     # 用户搜索 (User Search)
@@ -150,3 +150,4 @@ class DouyinAPIEndpoints:
     # 抖音视频频道 (Douyin Video Channel)
     DOUYIN_VIDEO_CHANNEL = f"{DOUYIN_DOMAIN}/aweme/v1/web/channel/feed/"
 
+    SEARCH_ITEM = f"{DOUYIN_DOMAIN}/aweme/v1/web/search/item/"
