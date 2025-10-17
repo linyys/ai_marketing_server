@@ -1,6 +1,8 @@
 import asyncio
+import logging
 import os
-from urllib.parse import urlencode
+import threading
+from urllib.parse import urlencode, quote
 from .abogus import ABogus
 from .utils import (AwemeIdFetcher, generate_base_params, generate_webid, generate_uifid)
 import yaml
@@ -12,33 +14,69 @@ from modules.douyin.web.models import (
 )
 from modules.douyin.web.utils import BogusManager
 
-# 配置文件路径
-path = os.path.abspath(os.path.dirname(__file__))
-
-# 读取配置文件
-with open(f"{path}/config.yaml", "r", encoding="utf-8") as f:
-    config = yaml.safe_load(f)
-
+# 初始化logger实例
+logger = logging.getLogger(__name__)
 
 class DouyinWebCrawler:
     def __init__(self):
-        self.headers = config["TokenManager"]["douyin"]["headers"]
-        self.proxies = config["TokenManager"]["douyin"]["proxies"]
-        self.session = BaseCrawler(proxies=self.proxies, crawler_headers=self.headers)
-        self.abogus = ABogus()
+        self._config_lock = threading.RLock()
+        self._load_config()
+    
+    def _load_config(self):
+        """安全加载配置（线程安全）"""
+        config_path = "src/modules/douyin/web/config.yaml"
+        with self._config_lock:
+            try:
+                with open(config_path, 'r', encoding='utf-8') as f:
+                    config = yaml.safe_load(f)
+                    self.headers = config['TokenManager']['douyin']['headers']
+                    self.cookies = self._parse_cookies(self.headers.get('Cookie', ''))
+                logger.debug("成功加载抖音配置")
+            except Exception as e:
+                logger.error(f"加载配置失败: {str(e)}")
+                self.headers = {'User-Agent': 'Mozilla/5.0'}
+                self.cookies = {}
+    
+    def reload_config(self):
+        """外部调用的配置重载方法"""
+        self._load_config()
+        logger.info("抖音爬虫配置已重新加载")
+    
+    def cleanup(self):
+        """清理资源（用于实例替换）"""
+        pass
+        
+    def _parse_cookies(self, cookie_str: str) -> dict:
+        """安全解析Cookie字符串，避免IndexError"""
+        cookies = {}
+        if not cookie_str:
+            return cookies
+        for cookie in cookie_str.split(';'):
+            cookie = cookie.strip()
+            if '=' in cookie:
+                key, value = cookie.split('=', 1)  # 只分割一次，避免多等号问题
+                cookies[key] = value
+        return cookies
 
     async def get_douyin_headers(self):
         """获取抖音请求头配置"""
-        douyin_config = config["TokenManager"]["douyin"]
-        kwargs = {
-            "headers": {
-                "Accept-Language": douyin_config["headers"]["Accept-Language"],
-                "User-Agent": douyin_config["headers"]["User-Agent"],
-                "Referer": douyin_config["headers"]["Referer"],
-                "Cookie": douyin_config["headers"]["Cookie"],
-            },
-            "proxies": {"http://": douyin_config["proxies"]["http"], "https://": douyin_config["proxies"]["https"]},
-        }
+        with self._config_lock:
+            douyin_config = {
+                "headers": self.headers.copy(),
+                "proxies": {
+                    "http": self.headers.get("http", ""),
+                    "https": self.headers.get("https", "")
+                }
+            }
+            kwargs = {
+                "headers": {
+                    "Accept-Language": douyin_config["headers"]["Accept-Language"],
+                    "User-Agent": douyin_config["headers"]["User-Agent"],
+                    "Referer": douyin_config["headers"]["Referer"],
+                    "Cookie": douyin_config["headers"]["Cookie"],
+                },
+                "proxies": {"http": douyin_config["proxies"]["http"], "https": douyin_config["proxies"]["https"]},
+            }
         return kwargs
 
     async def fetch_one_video(self, aweme_id: str):
@@ -102,6 +140,9 @@ class DouyinWebCrawler:
         Returns:
             推荐词列表，格式: [{"content": "推荐词1", ...}, ...]
         """
+        # 获取抖音的实时Cookie和请求头
+        kwargs = await self.get_douyin_headers()
+        
         # 基础参数（复用现有生成方法）
         params = generate_base_params()
         params.update({
@@ -115,12 +156,14 @@ class DouyinWebCrawler:
         })
         
         # 动态生成关键参数
-        params["a_bogus"] = self.abogus.get_value(params)
+        params["a_bogus"] = BogusManager.ab_model_2_endpoint(params, kwargs["headers"]["User-Agent"])
         params["msToken"] = self._generate_ms_token()  # 可复用xbogus.py的逻辑
         
         # 发送请求
-        url = "https://www.douyin.com/aweme/v1/web/search/sug/?" + urlencode(params)
-        response = await self.session.fetch_get_json(url)
+        url = "https://www.douyin.com/aweme/v1/web/search/sug/?"
+        async with BaseCrawler(proxies=kwargs["proxies"], crawler_headers=kwargs["headers"]) as crawler:
+            endpoint = f"{url}{urlencode(params)}"
+            response = await crawler.fetch_get_json(endpoint)
         
         # 解析响应
         return response.get("sug_list", [])
@@ -181,3 +224,4 @@ class DouyinWebCrawler:
         """生成msToken"""
         from src.modules.douyin.web.utils import TokenManager
         return TokenManager().gen_real_msToken()
+        

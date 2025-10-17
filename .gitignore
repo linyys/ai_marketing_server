@@ -9,3 +9,4 @@ file
 .pytest_cache
 **/*.db
 other
+src/modules/douyin/web/config.yaml

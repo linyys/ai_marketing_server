@@ -1,6 +1,7 @@
 import logging
 from typing import List
 from fastapi import APIRouter, HTTPException, status, Query
+from src.modules.douyin.cookie_service import cookie_manager
 
 from src.schemas.douyin import DouyinSearchRequest
 from src.modules.douyin.controller import (
@@ -81,3 +82,25 @@ async def search_video(
     """
     request = DouyinSearchRequest(keyword=keyword, offset=offset, count=count)
     return await controller.search_videos(request)
+
+@router.post("/update-cookie", summary="更新抖音Cookie")
+async def update_douyin_cookie(
+    cookie: str = Query(..., description="完整的Cookie字符串")
+):
+    """
+    更新抖音请求使用的Cookie
+    
+    - **cookie**: 完整的Cookie字符串，必须包含所有必要字段
+    """
+    try:
+        # 使用CookieManager更新配置
+        result = cookie_manager.update_cookie(cookie)
+        return result
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        logger.error(f"更新Cookie时发生意外错误: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="内部服务器错误"
+        )
