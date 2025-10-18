@@ -1,6 +1,8 @@
 import logging
 from typing import List
-from fastapi import APIRouter, HTTPException, status, Query
+from fastapi import APIRouter, HTTPException, status, Query, Body, Depends
+from src.modules.douyin.cookie_service import cookie_manager, UserCookieManager
+from src.utils.auth import get_current_user, get_current_admin, get_current_admin_or_user
 
 from src.schemas.douyin import DouyinSearchRequest
 from src.modules.douyin.controller import (
@@ -9,12 +11,17 @@ from src.modules.douyin.controller import (
     fetch_user_videos_service,
     fetch_user_profile_service,
     fetch_video_comments_service,
-    fetch_search_suggestions_service
+    fetch_search_suggestions_service,
+    _validate_cookie_update_request
 )
-from schemas.douyin import (
-    VideoDetailResponse, UserVideosResponse,
-    UserProfileResponse, VideoCommentsResponse,
-    SearchSuggestion, DouyinSearchResponse
+from src.schemas.douyin import (
+    DouyinSearchRequest,
+    VideoDetailResponse,
+    UserVideosResponse,
+    UserProfileResponse,
+    VideoCommentsResponse,
+    SearchSuggestion,
+    DouyinSearchResponse
 )
 
 logger = logging.getLogger(__name__)
@@ -81,3 +88,129 @@ async def search_video(
     """
     request = DouyinSearchRequest(keyword=keyword, offset=offset, count=count)
     return await controller.search_videos(request)
+
+@router.post("/update-cookie", summary="更新抖音Cookie")
+async def update_douyin_cookie(
+    cookie: str = Body(..., embed=True, description="完整的Cookie字符串"),
+    target_user_id: str = Query(None, description="管理员可选：指定要更新的用户ID，不指定则更新公共Cookie"),
+    current_user: dict = Depends(get_current_admin_or_user)
+):
+    """
+    更新抖音请求使用的Cookie（支持普通用户和管理员）
+    
+    - **cookie**: 完整的Cookie字符串，必须包含所有必要字段
+    - **target_user_id**: 管理员可选参数，指定要更新的用户ID
+    """
+    try:
+        # 验证Cookie有效性
+        _validate_cookie_update_request(cookie)
+        
+        # 检查当前用户类型
+        is_admin = getattr(current_user, 'is_admin', False) if hasattr(current_user, 'is_admin') else \
+                   current_user.get('is_admin', False)
+        user_id = getattr(current_user, 'uid', None) if hasattr(current_user, 'uid') else \
+                 current_user.get('user_id')
+        
+        # 处理逻辑分支
+        if is_admin:
+            # 管理员逻辑
+            if target_user_id:
+                # 管理员更新特定用户的Cookie
+                logger.info(f"管理员{user_id}更新用户{target_user_id}的Cookie")
+                user_manager = UserCookieManager(target_user_id)
+                return user_manager.update_cookie(cookie)
+            else:
+                # 管理员更新公共Cookie
+                logger.info(f"管理员{user_id}更新公共Cookie")
+                return cookie_manager.update_cookie(cookie)
+        else:
+            # 普通用户只能更新自己的Cookie
+            if not user_id:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="用户ID无效"
+                )
+            
+            logger.info(f"用户{user_id}更新自己的Cookie")
+            user_manager = UserCookieManager(user_id)
+            return user_manager.update_cookie(cookie)
+            
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        logger.error(f"更新Cookie时发生意外错误: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="内部服务器错误"
+        )
+
+@router.post("/toggle-user-mode", summary="切换用户专属模式")
+async def toggle_user_specific_mode(
+    enable: bool = Body(..., embed=True),
+    current_user = Depends(get_current_admin)  # 仅管理员可操作
+):
+    """
+    切换抖音Cookie的用户专属模式
+    
+    - **enable**: 是否启用用户专属模式
+    - **current_user**: 当前管理员信息
+    """
+    try:
+        logger.info(f"管理员{current_user.username}尝试{'启用' if enable else '禁用'}用户专属模式")
+        return cookie_manager.toggle_user_specific_mode(enable)
+    except Exception as e:
+        logger.error(f"切换用户专属模式失败: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="内部服务器错误"
+        )
+
+@router.post("/restore-cookie", summary="恢复用户Cookie配置")
+async def restore_user_cookie(
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    从备份恢复用户专属Cookie配置
+    
+    - **current_user**: 当前认证用户信息
+    """
+    try:
+        user_id = current_user.get("user_id")
+        if not user_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="用户ID无效"
+            )
+        
+        logger.info(f"用户{user_id}请求恢复Cookie配置")
+        user_manager = UserCookieManager(user_id)
+        return user_manager.restore_from_backup()
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"恢复Cookie配置时发生错误: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="内部服务器错误"
+        )
+
+@router.post("/cleanup-expired-configs", summary="清理过期用户配置")
+async def cleanup_expired_configs(
+    days: int = Body(30, embed=True, ge=7, le=365),
+    current_user = Depends(get_current_admin)  # 仅管理员可操作
+):
+    """
+    清理指定天数未更新的用户配置
+    
+    - **days**: 保留天数（7-365天，默认30天）
+    - **current_user**: 当前管理员信息
+    """
+    try:
+        logger.info(f"管理员{current_user.username}请求清理{days}天前的过期配置")
+        return cookie_manager.cleanup_expired_user_configs(days)
+    except Exception as e:
+        logger.error(f"清理过期配置时发生错误: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="内部服务器错误"
+        )
