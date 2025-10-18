@@ -117,7 +117,7 @@ async def update_douyin_cookie(
                 # 管理员更新特定用户的Cookie
                 logger.info(f"管理员{user_id}更新用户{target_user_id}的Cookie")
                 user_manager = UserCookieManager(target_user_id)
-                return user_manager.update_cookie(cookie)
+                return user_manager.update_user_cookie(cookie)
             else:
                 # 管理员更新公共Cookie
                 logger.info(f"管理员{user_id}更新公共Cookie")
@@ -132,7 +132,7 @@ async def update_douyin_cookie(
             
             logger.info(f"用户{user_id}更新自己的Cookie")
             user_manager = UserCookieManager(user_id)
-            return user_manager.update_cookie(cookie)
+            return user_manager.update_user_cookie(cookie)
             
     except HTTPException as he:
         raise he
