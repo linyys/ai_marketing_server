@@ -1,6 +1,6 @@
 import logging
 import threading
-from typing import Any, List
+from typing import Any, List, Dict
 from fastapi import HTTPException, status
 
 from src.schemas.douyin import DouyinSearchRequest, DouyinSearchResponse
@@ -15,26 +15,53 @@ logger = logging.getLogger(__name__)
 
 # 创建全局锁确保线程安全
 crawler_lock = threading.RLock()
-crawler_instance = None  # 初始化为None
+user_crawlers: Dict[str, DouyinWebCrawler] = {}
+global_crawler = None
 
-def _initialize_crawler():
+def _initialize_crawler(user_id: str = None) -> DouyinWebCrawler:
     """安全初始化爬虫实例"""
-    global crawler_instance
     with crawler_lock:
-        if crawler_instance is None:
-            crawler_instance = DouyinWebCrawler()
-            logger.info("成功初始化抖音爬虫实例")
+        if user_id:
+            # 用户专属模式
+            if user_id not in user_crawlers:
+                user_crawlers[user_id] = DouyinWebCrawler(user_id)
+                logger.info(f"成功初始化用户{user_id}的抖音爬虫实例")
+            return user_crawlers[user_id]
+        else:
+            # 全局模式
+            global global_crawler
+            if global_crawler is None:
+                global_crawler = DouyinWebCrawler()
+                logger.info("成功初始化全局抖音爬虫实例")
+            return global_crawler
 
-def _refresh_crawler():
+def _refresh_crawler(user_id: str = None):
     """刷新爬虫实例"""
-    global crawler_instance
     with crawler_lock:
-        old_crawler = crawler_instance
-        crawler_instance = DouyinWebCrawler()
-        logger.info("抖音爬虫实例已刷新，旧实例将被垃圾回收")
-        
-        if hasattr(old_crawler, 'cleanup') and callable(old_crawler.cleanup):
-            old_crawler.cleanup()
+        if user_id:
+            # 刷新特定用户的爬虫实例
+            if user_id in user_crawlers:
+                old_crawler = user_crawlers[user_id]
+                user_crawlers[user_id] = DouyinWebCrawler(user_id)
+                logger.info(f"用户{user_id}的抖音爬虫实例已刷新")
+                if hasattr(old_crawler, 'cleanup') and callable(old_crawler.cleanup):
+                    old_crawler.cleanup()
+        else:
+            # 刷新全局爬虫实例
+            global global_crawler
+            old_crawler = global_crawler
+            global_crawler = DouyinWebCrawler()
+            logger.info("全局抖音爬虫实例已刷新")
+            if hasattr(old_crawler, 'cleanup') and callable(old_crawler.cleanup):
+                old_crawler.cleanup()
+
+# 更新全局Cookie时同时刷新所有用户的爬虫实例
+def _refresh_all_crawlers():
+    """刷新所有爬虫实例"""
+    _refresh_crawler()  # 刷新全局实例
+    # 刷新所有用户实例
+    for user_id in list(user_crawlers.keys()):
+        _refresh_crawler(user_id)
 
 # 注册到CookieManager
 try:
@@ -46,11 +73,12 @@ except ImportError as e:
     logger.error(f"注册Cookie回调失败: {str(e)}")
     _initialize_crawler()
 
-def _get_active_crawler():
+def _get_active_crawler(user_id: str = None) -> DouyinWebCrawler:
     """获取当前有效爬虫实例（线程安全）"""
-    if crawler_instance is None:
-        _initialize_crawler()
-    return crawler_instance
+    if user_id:
+        return _initialize_crawler(user_id)
+    else:
+        return _initialize_crawler()
 
 def _handle_response(result: Any, success_msg: str, error_msg: str, response_class):
     """统一处理响应结果"""
@@ -67,85 +95,85 @@ def _handle_response(result: Any, success_msg: str, error_msg: str, response_cla
             message=error_msg
         )
 
-async def fetch_video_detail_service(aweme_id: str) -> VideoDetailResponse:
-    """获取单个视频详情服务"""
+async def fetch_video_detail_service(aweme_id: str, user_id: str = None) -> VideoDetailResponse:
+    """获取视频详情服务"""
     try:
-        crawler = _get_active_crawler()
-        logger.info(f"开始获取视频详情，aweme_id: {aweme_id}")
-        result = await crawler.fetch_one_video(aweme_id)
-        logger.info(f"成功获取视频详情，aweme_id: {aweme_id}")
+        crawler = _get_active_crawler(user_id)
+        logger.info(f"{'用户' + user_id + ' ' if user_id else ''}开始获取视频详情，aweme_id: {aweme_id}")
+        result = await crawler.fetch_post_detail(aweme_id)
+        logger.info(f"{'用户' + user_id + ' ' if user_id else ''}成功获取视频详情")
         return _handle_response(
             result, "获取视频详情成功", "获取视频详情失败，未找到相关数据", VideoDetailResponse
         )
     except Exception as e:
-        logger.error(f"获取视频详情异常，aweme_id: {aweme_id}, 错误: {str(e)}")
+        logger.error(f"{'用户' + user_id + ' ' if user_id else ''}获取视频详情异常: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"获取视频详情失败: {str(e)}"
         )
 
-async def fetch_user_videos_service(sec_user_id: str, max_cursor: int, count: int) -> UserVideosResponse:
+async def fetch_user_videos_service(sec_user_id: str, max_cursor: int, count: int, user_id: str = None) -> UserVideosResponse:
     """获取用户作品列表服务"""
     try:
-        crawler = _get_active_crawler()
-        logger.info(f"开始获取用户作品列表，sec_user_id: {sec_user_id}")
+        crawler = _get_active_crawler(user_id)  # 使用用户专属爬虫或全局爬虫
+        logger.info(f"{'用户' + user_id + ' ' if user_id else ''}开始获取用户作品列表，sec_user_id: {sec_user_id}")
         result = await crawler.fetch_user_post_videos(sec_user_id, max_cursor, count)
-        logger.info(f"成功获取用户作品列表，sec_user_id: {sec_user_id}")
+        logger.info(f"{'用户' + user_id + ' ' if user_id else ''}成功获取用户作品列表，sec_user_id: {sec_user_id}")
         return _handle_response(
             result, "获取用户作品列表成功", "获取用户作品列表失败，未找到相关数据", UserVideosResponse
         )
     except Exception as e:
-        logger.error(f"获取用户作品列表异常，sec_user_id: {sec_user_id}, 错误: {str(e)}")
+        logger.error(f"{'用户' + user_id + ' ' if user_id else ''}获取用户作品列表异常，sec_user_id: {sec_user_id}, 错误: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"获取用户作品列表失败: {str(e)}"
         )
 
-async def fetch_user_profile_service(sec_user_id: str) -> UserProfileResponse:
+async def fetch_user_profile_service(sec_user_id: str, user_id: str = None) -> UserProfileResponse:
     """获取用户信息服务"""
     try:
-        crawler = _get_active_crawler()
-        logger.info(f"开始获取用户信息，sec_user_id: {sec_user_id}")
+        crawler = _get_active_crawler(user_id)  # 使用用户专属爬虫或全局爬虫
+        logger.info(f"{'用户' + user_id + ' ' if user_id else ''}开始获取用户信息，sec_user_id: {sec_user_id}")
         result = await crawler.handler_user_profile(sec_user_id)
-        logger.info(f"成功获取用户信息，sec_user_id: {sec_user_id}")
+        logger.info(f"{'用户' + user_id + ' ' if user_id else ''}成功获取用户信息，sec_user_id: {sec_user_id}")
         return _handle_response(
             result, "获取用户信息成功", "获取用户信息失败，未找到相关数据", UserProfileResponse
         )
     except Exception as e:
-        logger.error(f"获取用户信息异常，sec_user_id: {sec_user_id}, 错误: {str(e)}")
+        logger.error(f"{'用户' + user_id + ' ' if user_id else ''}获取用户信息异常，sec_user_id: {sec_user_id}, 错误: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"获取用户信息失败: {str(e)}"
         )
 
-async def fetch_video_comments_service(aweme_id: str, cursor: int, count: int) -> VideoCommentsResponse:
+async def fetch_video_comments_service(aweme_id: str, cursor: int, count: int, user_id: str = None) -> VideoCommentsResponse:
     """获取视频评论数据服务"""
     try:
-        crawler = _get_active_crawler()
-        logger.info(f"开始获取视频评论，aweme_id: {aweme_id}")
+        crawler = _get_active_crawler(user_id)  # 使用用户专属爬虫或全局爬虫
+        logger.info(f"{'用户' + user_id + ' ' if user_id else ''}开始获取视频评论，aweme_id: {aweme_id}")
         result = await crawler.fetch_video_comments(aweme_id, cursor, count)
-        logger.info(f"成功获取视频评论，aweme_id: {aweme_id}")
+        logger.info(f"{'用户' + user_id + ' ' if user_id else ''}成功获取视频评论，aweme_id: {aweme_id}")
         return _handle_response(
             result, "获取视频评论成功", "获取视频评论失败，未找到相关数据", VideoCommentsResponse
         )
     except Exception as e:
-        logger.error(f"获取视频评论异常，aweme_id: {aweme_id}, 错误: {str(e)}")
+        logger.error(f"{'用户' + user_id + ' ' if user_id else ''}获取视频评论异常，aweme_id: {aweme_id}, 错误: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"获取视频评论失败: {str(e)}"
         )
 
-async def fetch_search_suggestions_service(keyword: str) -> List[SearchSuggestion]:
+async def fetch_search_suggestions_service(keyword: str, user_id: str = None) -> List[SearchSuggestion]:
     """获取搜索建议服务"""
     try:
-        crawler = _get_active_crawler()
-        logger.info(f"开始获取搜索建议，关键词: {keyword}")
+        crawler = _get_active_crawler(user_id)  # 使用用户专属爬虫或全局爬虫
+        logger.info(f"{'用户' + user_id + ' ' if user_id else ''}开始获取搜索建议，关键词: {keyword}")
         suggestions_data = await crawler.get_search_suggestions(keyword)
         suggestions = [SearchSuggestion(content=item['content']) for item in suggestions_data]
-        logger.info(f"成功获取搜索建议，数量: {len(suggestions)}")
+        logger.info(f"{'用户' + user_id + ' ' if user_id else ''}成功获取搜索建议，数量: {len(suggestions)}")
         return suggestions
     except Exception as e:
-        logger.error(f"获取搜索建议异常，关键词: {keyword}, 错误: {str(e)}")
+        logger.error(f"{'用户' + user_id + ' ' if user_id else ''}获取搜索建议异常，关键词: {keyword}, 错误: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"获取搜索建议失败: {str(e)}"
@@ -153,10 +181,10 @@ async def fetch_search_suggestions_service(keyword: str) -> List[SearchSuggestio
 
 
 class DouyinController:
-    async def search_videos(self, request: DouyinSearchRequest) -> DouyinSearchResponse:
+    async def search_videos(self, request: DouyinSearchRequest, user_id: str = None) -> DouyinSearchResponse:
         """处理抖音视频搜索请求"""
         try:
-            crawler = _get_active_crawler()
+            crawler = _get_active_crawler(user_id)
             result = await crawler.search_videos(
                 keyword=request.keyword,
                 offset=request.offset,

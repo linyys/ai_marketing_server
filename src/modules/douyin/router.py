@@ -37,48 +37,70 @@ def _validate_required_param(param_value: str, param_name: str) -> None:
         )
 
 @router.get("/video/detail", response_model=VideoDetailResponse, summary="获取单个视频详情")
-async def get_video_detail(aweme_id: str = Query(..., description="视频ID")):
+async def get_video_detail(
+    aweme_id: str = Query(..., description="视频ID"),
+    current_user: dict = Depends(get_current_user(optional=True))  # 设为可选认证
+):
     """获取抖音单个视频详情"""
     _validate_required_param(aweme_id, "aweme_id")
-    return await fetch_video_detail_service(aweme_id)
+    # 获取用户ID（如果已认证）
+    user_id = getattr(current_user, 'uid', None) or getattr(current_user, 'user_id', None) if current_user else None
+    return await fetch_video_detail_service(aweme_id, user_id)
 
 @router.get("/user/videos", response_model=UserVideosResponse, summary="获取用户作品列表")
 async def get_user_videos(
     sec_user_id: str = Query(..., description="用户ID"),
     max_cursor: int = Query(0, description="分页游标"),
-    count: int = Query(20, description="每页数量")
+    count: int = Query(20, description="每页数量"),
+    current_user: dict = Depends(get_current_user(optional=True))  # 添加可选认证
 ):
     """获取抖音用户作品列表"""
     _validate_required_param(sec_user_id, "sec_user_id")
-    return await fetch_user_videos_service(sec_user_id, max_cursor, count)
+    # 获取用户ID（如果已认证）
+    user_id = getattr(current_user, 'uid', None) or getattr(current_user, 'user_id', None) if current_user else None
+    return await fetch_user_videos_service(sec_user_id, max_cursor, count, user_id)  # 传递user_id
 
 @router.get("/user/profile", response_model=UserProfileResponse, summary="获取用户信息")
-async def get_user_profile(sec_user_id: str = Query(..., description="用户ID")):
+async def get_user_profile(
+    sec_user_id: str = Query(..., description="用户ID"),
+    current_user: dict = Depends(get_current_user(optional=True))  # 添加可选认证
+):
     """获取抖音用户信息"""
     _validate_required_param(sec_user_id, "sec_user_id")
-    return await fetch_user_profile_service(sec_user_id)
+    # 获取用户ID（如果已认证）
+    user_id = getattr(current_user, 'uid', None) or getattr(current_user, 'user_id', None) if current_user else None
+    return await fetch_user_profile_service(sec_user_id, user_id)  # 传递user_id
 
 @router.get("/video/comments", response_model=VideoCommentsResponse, summary="获取视频评论")
 async def get_video_comments(
     aweme_id: str = Query(..., description="视频ID"),
     cursor: int = Query(0, description="分页游标"),
-    count: int = Query(20, description="每页数量")
+    count: int = Query(20, description="每页数量"),
+    current_user: dict = Depends(get_current_user(optional=True))  # 添加可选认证
 ):
     """获取抖音视频评论数据"""
     _validate_required_param(aweme_id, "aweme_id")
-    return await fetch_video_comments_service(aweme_id, cursor, count)
+    # 获取用户ID（如果已认证）
+    user_id = getattr(current_user, 'uid', None) or getattr(current_user, 'user_id', None) if current_user else None
+    return await fetch_video_comments_service(aweme_id, cursor, count, user_id)  # 传递user_id
 
 @router.get("/search/suggestions", response_model=List[SearchSuggestion], summary="获取搜索建议")
-async def get_search_suggestions(keyword: str = Query(..., description="搜索关键词")):
+async def get_search_suggestions(
+    keyword: str = Query(..., description="搜索关键词"),
+    current_user: dict = Depends(get_current_user(optional=True))  # 添加可选认证
+):
     """根据关键词获取抖音搜索建议"""
     _validate_required_param(keyword, "keyword")
-    return await fetch_search_suggestions_service(keyword)
+    # 获取用户ID（如果已认证）
+    user_id = getattr(current_user, 'uid', None) or getattr(current_user, 'user_id', None) if current_user else None
+    return await fetch_search_suggestions_service(keyword, user_id)  # 传递user_id
 
 @router.get("/search/video", response_model=DouyinSearchResponse, summary="获取视频信息")
 async def search_video(
     keyword: str = Query(..., description="搜索关键词"),
     offset: int = Query(0, ge=0, description="分页偏移量"),
-    count: int = Query(16, ge=1, le=50, description="每页数量")
+    count: int = Query(16, ge=1, le=50, description="每页数量"),
+    current_user: dict = Depends(get_current_user(optional=True))  # 设为可选认证
 ):
     """
     搜索抖音视频
@@ -87,7 +109,9 @@ async def search_video(
     - **count**: 每页数量（1-50，默认16）
     """
     request = DouyinSearchRequest(keyword=keyword, offset=offset, count=count)
-    return await controller.search_videos(request)
+    # 获取用户ID（如果已认证）
+    user_id = getattr(current_user, 'uid', None) or getattr(current_user, 'user_id', None) if current_user else None
+    return await controller.search_videos(request, user_id)
 
 @router.post("/update-cookie", summary="更新抖音Cookie")
 async def update_douyin_cookie(
