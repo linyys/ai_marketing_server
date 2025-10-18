@@ -6,36 +6,92 @@ from urllib.parse import urlencode, quote
 from .abogus import ABogus
 from .utils import (AwemeIdFetcher, generate_base_params, generate_webid, generate_uifid)
 import yaml
+from pathlib import Path
+from src.modules.douyin.utils.config_manager import get_user_config_path as get_user_cookie_path
 
-from modules.douyin.base_crawler import BaseCrawler
-from modules.douyin.web.endpoints import DouyinAPIEndpoints
-from modules.douyin.web.models import (
+from src.modules.douyin.base_crawler import BaseCrawler
+from src.modules.douyin.web.endpoints import DouyinAPIEndpoints
+from src.modules.douyin.web.models import (
     PostComments, PostDetail, UserProfile, UserPost
 )
-from modules.douyin.web.utils import BogusManager
+from src.modules.douyin.web.utils import BogusManager
 
 # 初始化logger实例
 logger = logging.getLogger(__name__)
 
 class DouyinWebCrawler:
-    def __init__(self):
+    def __init__(self, user_id: str = None):
+        """
+        初始化抖音Web爬虫
+        
+        Args:
+            user_id: 可选的用户ID，用于加载用户专属配置
+        """
+        self.user_id = user_id
         self._config_lock = threading.RLock()
+        self.abogus = BogusManager()  # 初始化abogus
+        
+        # 集成 cookie_manager
+        from src.modules.douyin.cookie_service import cookie_manager as global_cookie_manager
+        self.cookie_manager = global_cookie_manager
+        self.user_mode_enabled = self.cookie_manager.is_user_specific_mode()
+        
+        # 选择配置路径
+        if user_id:
+            # 用户专属模式
+            self.config_path = get_user_cookie_path(user_id)
+        else:
+            # 全局模式（保持向后兼容）
+            self.config_path = Path("src/modules/douyin/web/config.yaml")
+        
         self._load_config()
     
     def _load_config(self):
         """安全加载配置（线程安全）"""
-        config_path = "src/modules/douyin/web/config.yaml"
         with self._config_lock:
             try:
-                with open(config_path, 'r', encoding='utf-8') as f:
-                    config = yaml.safe_load(f)
-                    self.headers = config['TokenManager']['douyin']['headers']
-                    self.cookies = self._parse_cookies(self.headers.get('Cookie', ''))
-                logger.debug("成功加载抖音配置")
+                if self.config_path.exists():
+                    with open(self.config_path, 'r', encoding='utf-8') as f:
+                        config = yaml.safe_load(f)
+                        self.headers = config['TokenManager']['douyin']['headers']
+                        self.cookies = self._parse_cookies(self.headers.get('Cookie', ''))
+                        # 加载额外的用户配置项
+                        self.timeout = config.get('timeout', 30)
+                        self.retry_count = config.get('retry_count', 3)
+                        self.proxy = config.get('proxy', None)
+                    logger.debug(f"{'用户' + self.user_id if self.user_id else '全局'}：成功加载配置")
+                else:
+                    # 使用默认配置
+                    self.headers = {
+                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36'
+                    }
+                    self.cookies = {}
+                    self.timeout = 30
+                    self.retry_count = 3
+                    self.proxy = None
+                    logger.warning(f"{'用户' + self.user_id if self.user_id else '全局'}：配置文件不存在，使用默认配置")
             except Exception as e:
-                logger.error(f"加载配置失败: {str(e)}")
-                self.headers = {'User-Agent': 'Mozilla/5.0'}
+                logger.error(f"{'用户' + self.user_id if self.user_id else '全局'}：加载配置失败: {str(e)}")
+                # 加载失败时使用安全默认值
+                self.headers = {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36'
+                }
                 self.cookies = {}
+                self.timeout = 30
+                self.retry_count = 3
+                self.proxy = None
+                # 尝试从全局配置回退
+                if self.user_id:
+                    try:
+                        global_config_path = Path("src/modules/douyin/web/config.yaml")
+                        if global_config_path.exists():
+                            with open(global_config_path, 'r', encoding='utf-8') as f:
+                                config = yaml.safe_load(f)
+                                self.headers = config['TokenManager']['douyin']['headers']
+                                self.cookies = self._parse_cookies(self.headers.get('Cookie', ''))
+                            logger.info(f"用户{self.user_id}配置加载失败，已回退到全局配置")
+                    except:
+                        pass
     
     def reload_config(self):
         """外部调用的配置重载方法"""
@@ -197,7 +253,7 @@ class DouyinWebCrawler:
         })
         
         # 生成a_bogus参数
-        params["a_bogus"] = self.abogus.get_value(params)
+        params["a_bogus"] = BogusManager.ab_model_2_endpoint(params, kwargs["headers"]["User-Agent"])
         params["msToken"] = self._generate_ms_token()
         
         # 发送请求
@@ -224,4 +280,10 @@ class DouyinWebCrawler:
         """生成msToken"""
         from src.modules.douyin.web.utils import TokenManager
         return TokenManager().gen_real_msToken()
+
+    def get_cookie(self, user_id: str = None) -> dict:
+        """获取Cookie配置"""
+        # 保持使用 _load_config 加载的配置，与类的其他部分保持一致
+        with self._config_lock:
+            return self.cookies.copy()  # 返回当前加载的Cookie副本
         
