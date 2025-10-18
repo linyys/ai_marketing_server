@@ -13,6 +13,7 @@ from crud.admin import get_admin_by_uid
 from utils.jwt_utils import verify_token
 
 security = HTTPBearer()
+security_optional = HTTPBearer(auto_error=False)
 
 def get_current_user(optional: bool = False):
     """获取当前用户，支持可选认证
@@ -24,7 +25,8 @@ def get_current_user(optional: bool = False):
     Returns:
         用户对象或None（当optional=True且未提供有效认证时）
     """
-    def dependency(credentials: HTTPAuthorizationCredentials = Security(security, auto_error=False)):
+    # 根据optional参数选择合适的security依赖
+    def dependency(credentials: HTTPAuthorizationCredentials = Depends(security_optional if optional else security)):
         if not credentials:
             if optional:
                 return None
@@ -65,8 +67,6 @@ def get_current_user(optional: bool = False):
             )
     
     return dependency
-
-
 
 def get_current_admin(credentials: HTTPAuthorizationCredentials = Depends(security), db: Session = Depends(get_db)):
     """
