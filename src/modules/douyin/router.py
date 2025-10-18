@@ -93,7 +93,7 @@ async def search_video(
 async def update_douyin_cookie(
     cookie: str = Body(..., embed=True, description="完整的Cookie字符串"),
     target_user_id: str = Query(None, description="管理员可选：指定要更新的用户ID，不指定则更新公共Cookie"),
-    current_user: dict = Depends(get_current_admin_or_user)
+    current_user = Depends(get_current_admin_or_user)
 ):
     """
     更新抖音请求使用的Cookie（支持普通用户和管理员）
@@ -105,11 +105,10 @@ async def update_douyin_cookie(
         # 验证Cookie有效性
         _validate_cookie_update_request(cookie)
         
-        # 检查当前用户类型
-        is_admin = getattr(current_user, 'is_admin', False) if hasattr(current_user, 'is_admin') else \
-                   current_user.get('is_admin', False)
-        user_id = getattr(current_user, 'uid', None) if hasattr(current_user, 'uid') else \
-                 current_user.get('user_id')
+        # 检查当前用户类型 - 修复：统一使用getattr访问属性
+        is_admin = getattr(current_user, 'is_admin', False)
+        # 优先使用uid，其次尝试user_id属性
+        user_id = getattr(current_user, 'uid', None) or getattr(current_user, 'user_id', None)
         
         # 处理逻辑分支
         if is_admin:
