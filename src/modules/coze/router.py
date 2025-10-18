@@ -71,6 +71,38 @@ async def video_market_analysis(
     )
 
 
+class MarketAnalysisVideoItem(BaseModel):
+    desc: str
+    look_count: int
+    digg_count: int
+    comment_count: int
+    share_count: int
+
+
+class MarketAnalysisRequest(BaseModel):
+    keyword: str
+    lenovo_keyword: List[str]
+    video_list: List[MarketAnalysisVideoItem]
+
+
+@router.post("/streaming/market_analysis")
+async def market_analysis(
+    request: Request,
+    data: MarketAnalysisRequest
+) -> StreamingResponse:
+    params = {
+        "keyword": data.keyword,
+        "lenovo_keyword": data.lenovo_keyword,
+        "video_list": [item.model_dump() for item in data.video_list],
+    }
+    return StreamingResponse(
+        streamingController.forward_sse(
+            request, get_workflow_id("market_analysis"), params
+        ),
+        headers=streaming_headers,
+    )
+
+
 @router.post("/prompt_generate")
 async def prompt_generate(
     prompt_template: str = Form(...),

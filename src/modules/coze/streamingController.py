@@ -85,4 +85,22 @@ async def video_market_analysis(request: Request, params: _video_market_analysis
     return forward_sse(request, get_workflow_id("video_market_analysis"), params)
 
 
+class _market_analysis_item(TypedDict):
+    desc: str
+    look_count: int
+    digg_count: int
+    comment_count: int
+    share_count: int
+
+
+class _market_analysis(TypedDict):
+    keyword: str
+    lenovo_keyword: List[str]
+    video_list: List[_market_analysis_item]
+
+
+async def market_analysis(request: Request, params: _market_analysis):
+    return forward_sse(request, get_workflow_id("market_analysis"), params)
+
+
 

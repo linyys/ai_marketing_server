@@ -33,6 +33,11 @@ class WorkflowConfig:
             "workflow_id": "7517866010540654646",
             "name": "视频转文字",
             "is_streaming": False
+        },
+        "market_analysis": {
+            "workflow_id": "7561643194401210411",
+            "name": "市场分析",
+            "is_streaming": True
         }
     }
     
