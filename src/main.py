@@ -213,7 +213,7 @@ if __name__ == "__main__":
     
     uvicorn.run(
         "main:app",
-        host=dev,
+        host=pre,
         port=8001,
         reload=True,
         workers=1,
