@@ -16,6 +16,8 @@ class User(Base):
     updated_time = Column(TIMESTAMP, nullable=False, server_default=func.now(), onupdate=func.now(), comment='更新时间')
     last_login_time = Column(TIMESTAMP, nullable=True, comment='最后登录时间')
     
+    point = Column(Integer, nullable=False, default=0, comment='用户当前积分')
+    
     __table_args__ = (
         Index('idx_is_del', 'is_del'),
         Index('idx_created_time', 'created_time'),

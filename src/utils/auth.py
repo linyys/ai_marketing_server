@@ -13,60 +13,40 @@ from crud.admin import get_admin_by_uid
 from utils.jwt_utils import verify_token
 
 security = HTTPBearer()
-security_optional = HTTPBearer(auto_error=False)
 
-def get_current_user(optional: bool = False):
-    """获取当前用户，支持可选认证
-    
-    Args:
-        optional: 是否启用可选认证模式。设置为True时，未提供认证凭据将返回None，而不是抛出异常。
-        适用于需要同时支持匿名访问和登录用户访问的接口。
-        
-    Returns:
-        用户对象或None（当optional=True且未提供有效认证时）
+def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security), db: Session = Depends(get_db)):
     """
-    # 根据optional参数选择合适的security依赖
-    def dependency(credentials: HTTPAuthorizationCredentials = Depends(security_optional if optional else security)):
-        if not credentials:
-            if optional:
-                return None
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="未提供认证凭据"
-            )
-        
-        try:
-            token_data = verify_token(credentials.credentials)
-            if not token_data:
-                if optional:
-                    return None
-                raise HTTPException(
-                    status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="无效的认证凭据"
-                )
-            
-            db = next(get_db())
-            user = get_user_by_uid(db, token_data.uid)
-            db.close()
-            
-            if not user:
-                if optional:
-                    return None
-                raise HTTPException(
-                    status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="用户不存在"
-                )
-            
-            return user
-        except Exception as e:
-            if optional:
-                return None
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="认证失败"
-            )
+    获取当前认证用户（强制认证）
     
-    return dependency
+    返回：
+        当前用户对象
+    异常：
+        认证失败抛出401
+    """
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="无效的认证凭据",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    
+    try:
+        payload = verify_token(credentials.credentials)
+        if payload is None:
+            raise credentials_exception
+        
+        user_id: str = payload.get("sub")
+        if user_id is None:
+            raise credentials_exception
+        
+        user = get_user_by_uid(db, user_id)
+        if user is None:
+            raise credentials_exception
+        
+        return user
+    except HTTPException:
+        raise
+    except Exception:
+        raise credentials_exception
 
 def get_current_admin(credentials: HTTPAuthorizationCredentials = Depends(security), db: Session = Depends(get_db)):
     """

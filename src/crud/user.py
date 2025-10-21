@@ -186,3 +186,33 @@ def search_users(db: Session, username: Optional[str] = None, email: Optional[st
     users = query.offset(skip).limit(limit).all()
     
     return users, total
+
+
+def update_user_point(db: Session, user_uid: str, point_change: int, allow_negative: bool = False) -> Optional[User]:
+    """调整用户积分
+    Args:
+        user_uid: 用户UID
+        point_change: 积分变化量（正数增加、负数扣减）
+        allow_negative: 是否允许结果为负数（流式场景可为True）
+    Returns:
+        更新后的User或None
+    Raises:
+        ValueError: 当积分不足且不允许负数时抛出
+    """
+    try:
+        user = get_user_by_uid(db, user_uid)
+        if not user:
+            return None
+        current_point = user.point or 0
+        new_point = current_point + point_change
+        if not allow_negative and new_point < 0:
+            raise ValueError("积分不足")
+        user.point = new_point
+        user.updated_time = datetime.now()
+        db.commit()
+        db.refresh(user)
+        return user
+    except Exception as e:
+        logger.error(f"Failed to update points for user {user_uid}: {e}")
+        db.rollback()
+        raise
