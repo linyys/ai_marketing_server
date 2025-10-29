@@ -1,10 +1,11 @@
 from sqlalchemy.orm import Session
 from typing import Optional, List, Dict
+from decimal import Decimal, ROUND_HALF_UP
 from crud.point_config import (
     create_point_config,
     update_point_config,
     list_point_configs,
-    get_point_config_by_function_id,
+    get_point_config_by_uid,
 )
 from crud.point_record import (
     get_point_records_by_user,
@@ -16,11 +17,12 @@ def _point_config_to_dict(pc) -> Dict:
         return None
     return {
         "id": pc.id,
-        "function_id": pc.function_id,
+        "uid": pc.uid,
         "function_name": pc.function_name,
         "workflow_id": pc.workflow_id,
-        "consume": pc.consume,
+        "token": str(pc.token),
         "measure_unit": pc.measure_unit,
+        "unit": pc.unit,
         "is_enable": pc.is_enable,
         "created_time": pc.created_time,
         "updated_time": pc.updated_time,
@@ -34,7 +36,9 @@ def _point_record_to_dict(pr) -> Dict:
         "id": pr.id,
         "uid": pr.uid,
         "from_user_uid": pr.from_user_uid,
-        "point": pr.point,
+        "function_name": pr.function_name,
+        "from_uid": pr.from_uid,
+        "point": str(Decimal(pr.point or 0).quantize(Decimal('0.000001'), rounding=ROUND_HALF_UP).normalize()),
         "record_type": pr.record_type,
         "record_desc": pr.record_desc,
         "created_time": pr.created_time,
@@ -46,20 +50,20 @@ def _point_record_to_dict(pr) -> Dict:
 
 def create_config_service(
     db: Session,
-    function_id: str,
     function_name: str,
     workflow_id: str,
-    consume: int,
+    token: "Decimal",
     measure_unit: int,
+    unit: int,
     is_enable: int = 1,
 ):
     pc = create_point_config(
         db=db,
-        function_id=function_id,
         function_name=function_name,
         workflow_id=workflow_id,
-        consume=consume,
+        token=token,
         measure_unit=measure_unit,
+        unit=unit,
         is_enable=is_enable,
     )
     return _point_config_to_dict(pc)
@@ -67,20 +71,22 @@ def create_config_service(
 
 def update_config_service(
     db: Session,
-    function_id: str,
+    uid: str,
     function_name: Optional[str] = None,
     workflow_id: Optional[str] = None,
-    consume: Optional[int] = None,
+    token: Optional["Decimal"] = None,
     measure_unit: Optional[int] = None,
+    unit: Optional[int] = None,
     is_enable: Optional[int] = None,
 ):
     pc = update_point_config(
         db=db,
-        function_id=function_id,
+        uid=uid,
         function_name=function_name,
         workflow_id=workflow_id,
-        consume=consume,
+        token=token,
         measure_unit=measure_unit,
+        unit=unit,
         is_enable=is_enable,
     )
     return _point_config_to_dict(pc)
@@ -92,8 +98,7 @@ def list_configs_service(db: Session) -> List[Dict]:
 
 
 def get_config_service(db: Session, uid: str) -> Optional[Dict]:
-    # 此处将 uid 视为 function_id（PointConfig 未设置独立 uid 字段）
-    pc = get_point_config_by_function_id(db, uid)
+    pc = get_point_config_by_uid(db, uid)
     return _point_config_to_dict(pc)
 
 

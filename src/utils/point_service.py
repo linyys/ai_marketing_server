@@ -1,4 +1,5 @@
 from typing import Optional, Tuple
+from decimal import Decimal
 from sqlalchemy.orm import Session
 from fastapi import HTTPException, status
 
@@ -19,35 +20,55 @@ class PointService:
     @staticmethod
     def check_non_streaming_workflow_points(db: Session, current_user: User, workflow_id: str) -> Optional[PointConfig]:
         """
-        非流式工作流事前积分校验。
-        - 如果绑定了积分配置且用户当前积分 <= 0，则阻断请求。
-        - 返回启用的积分配置（若不存在则代表免费）。
+        非流式工作流事前积分校验（与付费配置对齐）。
+        - 仅当存在启用配置、token>0、且配置了计费单位（非0）时要求用户当前积分>0；否则视为免费或不计费，直接放行。
+        - 若计量单位缺失（None），按系统默认“每字符”(1) 处理。
+        - 返回启用的积分配置（若不存在或未启用则代表免费）。
         """
         cfg = get_point_config_by_workflow_id(db, workflow_id)
-        if cfg and (current_user.point is None or current_user.point <= 0):
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="积分不足，无法执行该操作"
-            )
+        if cfg and cfg.is_enable == 1:
+            try:
+                token_positive = Decimal(cfg.token or 0) > Decimal('0')
+            except Exception:
+                token_positive = False
+
+            # 缺失则按默认“每字符”(1)；保留旧值0代表未计费
+            measure_unit = int(cfg.measure_unit) if getattr(cfg, 'measure_unit', None) is not None else 1
+            if token_positive and measure_unit != 0:
+                if current_user.point is None or Decimal(current_user.point or 0) <= Decimal('0'):
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail="积分不足，无法执行该操作"
+                    )
         return cfg
 
     @staticmethod
     def check_streaming_workflow_points(db: Session, current_user: User, workflow_id: str) -> Optional[PointConfig]:
         """
-        流式工作流事前积分校验。
-        - 规则同非流式：若绑定了积分配置且用户当前积分 <= 0，则阻断。
+        流式工作流事前积分校验（仅字符计费）。
+        - 仅当存在启用配置、计费为“每字符”（默认）、且 token>0 时要求用户当前积分>0；否则视为免费或不计费，直接放行。
         - 流式扣费在流结束后进行（允许负数）。
         """
         cfg = get_point_config_by_workflow_id(db, workflow_id)
-        if cfg and (current_user.point is None or current_user.point <= 0):
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="积分不足，无法开始流式任务"
-            )
+        if cfg and cfg.is_enable == 1:
+            # 仅字符计费且 token>0 时要求正余额
+            try:
+                token_positive = Decimal(cfg.token or 0) > Decimal('0')
+            except Exception:
+                token_positive = False
+
+            # 按约定：流式仅支持字符计费（measure_unit=1，缺失则默认1）
+            mu = int(cfg.measure_unit) if getattr(cfg, 'measure_unit', None) is not None else 1
+            if token_positive and mu == 1:
+                if current_user.point is None or Decimal(current_user.point or 0) <= Decimal('0'):
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail="积分不足，无法开始流式任务"
+                    )
         return cfg
 
     @staticmethod
-    def calculate(db: Session, workflow_id: str, usage_amount: Optional[int]) -> Tuple[int, str, Optional[PointConfig]]:
+    def calculate(db: Session, workflow_id: str, usage_amount: Optional[int]) -> Tuple[Decimal, str, Optional[PointConfig]]:
         """
         计算扣费金额并生成说明。
         - 返回 (总扣费积分, 描述, 配置对象)
@@ -55,13 +76,14 @@ class PointService:
         """
         cfg = get_point_config_by_workflow_id(db, workflow_id)
         if not cfg or cfg.is_enable != 1:
-            return 0, "免费使用，无积分扣减", None
+            return Decimal('0'), "免费使用，无积分扣减", None
 
-        total = calculate_consumption(cfg.consume, cfg.measure_unit, usage_amount)
+        total = calculate_consumption(cfg.token, cfg.measure_unit, cfg.unit, usage_amount)
         desc = format_consumption_desc(
-            cfg.function_name or get_workflow_name(cfg.function_id) if hasattr(cfg, 'function_id') else (cfg.function_name or workflow_id),
-            cfg.consume,
+            cfg.function_name or get_workflow_name(workflow_id),
+            cfg.token,
             cfg.measure_unit,
+            cfg.unit,
             usage_amount,
             total,
         )
@@ -84,20 +106,24 @@ class PointService:
         - 扣减：更新用户积分（负数表示扣减），插入积分记录（正数表示消耗）。
         """
         total, desc, cfg = PointService.calculate(db, workflow_id, usage_amount)
-        if total <= 0:
-            return {"is_free": True, "consumption": 0, "desc": "免费使用，无积分扣减"}
+        if total <= Decimal('0'):
+            return {"is_free": True, "consumption": Decimal('0'), "desc": "免费使用，无积分扣减"}
 
-        # 扣减用户积分：消耗用负值更新
-        update_user_point(db, user_uid=user_uid, point_delta=-total, allow_negative=allow_negative)
+        # 扣减用户积分：消耗用负值更新；若更新失败，不生成消费流水
+        updated_user = update_user_point(db, user_uid=user_uid, point_change=-total, allow_negative=allow_negative)
+        if updated_user is None:
+            # 用户不存在或扣减失败
+            raise ValueError("用户不存在或扣减失败")
 
         final_desc = f"{record_desc_prefix}，{desc}" if record_desc_prefix else desc
         create_point_record(
             db,
-            user_uid=user_uid,
             from_user_uid=from_user_uid or user_uid,
             point=total,
             record_type=record_type,
             record_desc=final_desc,
+            function_name=(cfg.function_name if cfg and cfg.function_name else get_workflow_name(workflow_id)),
+            from_uid=(cfg.uid if cfg else None),
         )
         return {"is_free": False, "consumption": total, "desc": final_desc}
 

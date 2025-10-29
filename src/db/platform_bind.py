@@ -15,4 +15,4 @@ class PlatformBind(Base):
     url = Column(String(255), nullable=False, comment='绑定的URL')
     user_name = Column(String(255), nullable=False, comment='绑定平台的用户名')
     user_desc = Column(String(255), nullable=False, comment='绑定平台的用户简介')
-    avatar = Column(String(255), nullable=False, comment='绑定平台的用户头像')
+    avatar = Column(LONGTEXT, nullable=False, comment='绑定平台的用户头像')

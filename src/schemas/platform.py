@@ -8,7 +8,7 @@ class PlatformBindCreate(BaseModel):
     url: str = Field(..., min_length=1, max_length=255, description="绑定的URL")
     user_name: str = Field(..., min_length=1, max_length=255, description="绑定平台的用户名")
     user_desc: str = Field(..., min_length=1, max_length=255, description="绑定平台的用户简介")
-    avatar: str = Field(..., min_length=1, max_length=255, description="绑定平台的用户头像")
+    avatar: str = Field(..., min_length=1, description="绑定平台的用户头像（LONGTEXT）")
 
     @field_validator("url")
     @classmethod
@@ -49,7 +49,7 @@ class PlatformBindEdit(BaseModel):
     url: Optional[str] = Field(None, min_length=1, max_length=255, description="绑定的URL")
     user_name: Optional[str] = Field(None, min_length=1, max_length=255, description="绑定平台的用户名")
     user_desc: Optional[str] = Field(None, min_length=1, max_length=255, description="绑定平台的用户简介")
-    avatar: Optional[str] = Field(None, min_length=1, max_length=255, description="绑定平台的用户头像")
+    avatar: Optional[str] = Field(None, min_length=1, description="绑定平台的用户头像（LONGTEXT）")
 
     @field_validator("url")
     @classmethod

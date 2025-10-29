@@ -12,6 +12,8 @@ import logging
 
 # 新增导入：积分服务与流式包装器、任务管理器
 from utils.point_service import PointService
+from crud.point_config import get_point_config_by_workflow_id
+from decimal import Decimal
 from utils.streaming_point_middleware import wrap_sse_with_point_deduction
 from modules.coze.task_manager import global_task_manager
 import json
@@ -55,16 +57,14 @@ async def copywriting_create(
     )
 
 
-class VideoMarketAnalysisItem(BaseModel):
-    desc: str
-    tag_name: List[str]
-    digg_count: int
+class VideoData(BaseModel):
     comment_count: int
-    share_count: int
-    collect_count: int
-    recommend_count: int
-    play_count: int
-
+    like_count: int
+    share: int
+    stat_date: str
+class VideoMarketAnalysisItem(BaseModel):
+    title: str
+    items: List[VideoData]
 
 class VideoMarketAnalysisRequest(BaseModel):
     input: List[VideoMarketAnalysisItem]
@@ -168,18 +168,47 @@ async def query_workflow(task_id: str, db: Session = Depends(get_db), current_us
     # 成功返回时进行非流式扣费（不允许负数）
     try:
         if resp.get("code") == 0 and workflow_id:
-            # 将输出转为字符串进行计量（按字符）
-            # 注意：若配置为按次或按分钟，服务层会自动处理单位
-            output_str = json.dumps(resp.get("data"), ensure_ascii=False)
-            PointService.consume_points_by_response(
-                db=db,
-                user_uid=current_user.uid,
-                from_user_uid=current_user.uid,
-                workflow_id=workflow_id,
-                response_text=output_str,
-                allow_negative=False,
-                record_desc_prefix=f"非流式扣费: workflow_id={workflow_id}",
-            )
+            # 根据积分配置的计量单位选择扣费计量方式
+            cfg = get_point_config_by_workflow_id(db, workflow_id)
+            if cfg and cfg.is_enable == 1 and Decimal(cfg.token or 0) > Decimal('0'):
+                mu = int(cfg.measure_unit or 0)
+                if mu == 1:  # 每字符
+                    output_str = json.dumps(resp.get("data"), ensure_ascii=False)
+                    PointService.consume_points_by_response(
+                        db=db,
+                        user_uid=current_user.uid,
+                        from_user_uid=current_user.uid,
+                        workflow_id=workflow_id,
+                        response_text=output_str,
+                        allow_negative=False,
+                        record_desc_prefix=f"非流式扣费: workflow_id={workflow_id}",
+                    )
+                elif mu == 2:  # 每次调用
+                    PointService.consume_points(
+                        db=db,
+                        user_uid=current_user.uid,
+                        from_user_uid=current_user.uid,
+                        workflow_id=workflow_id,
+                        usage_amount=1,
+                        allow_negative=False,
+                        record_desc_prefix=f"非流式扣费: workflow_id={workflow_id}",
+                    )
+                elif mu == 3:  # 每分钟（无耗时数据，按最小1分钟计）
+                    PointService.consume_points(
+                        db=db,
+                        user_uid=current_user.uid,
+                        from_user_uid=current_user.uid,
+                        workflow_id=workflow_id,
+                        usage_amount=0,  # 将按最小1分钟计费
+                        allow_negative=False,
+                        record_desc_prefix=f"非流式扣费: workflow_id={workflow_id}",
+                    )
+                else:
+                    # 未计费或未知单位，当作免费
+                    pass
+            else:
+                # 无配置或免费，不扣费
+                pass
     except Exception:
         # 扣费失败不影响查询响应，但应在日志系统记录
         pass

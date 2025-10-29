@@ -7,12 +7,16 @@ def create_post(base_url, header):
                 res = await client.post(base_url + url, headers=header, data=data, params=params, json=json)
                 return res.json()
             except Exception as e:
-                return {"code": 1, "msg": "请求失败", "data": e}
+                # 统一异常返回结构，避免上层解析失败
+                return {"code": 400, "txt": "请求失败", "error": str(e)}
     return post
 
 def create_get(base_url, header):
     async def get(url, params={}):
         async with httpx.AsyncClient() as client:
-            res = await client.get(base_url + url, headers=header, params=params)
-            return res.json()
+            try:
+                res = await client.get(base_url + url, headers=header, params=params)
+                return res.json()
+            except Exception as e:
+                return {"code": 400, "txt": "请求失败", "error": str(e)}
     return get

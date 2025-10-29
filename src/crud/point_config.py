@@ -1,33 +1,27 @@
 from sqlalchemy.orm import Session
 from typing import Optional, List
 from datetime import datetime
+from decimal import Decimal
 
 from db.point_config import PointConfig
 
 
 def create_point_config(
     db: Session,
-    function_id: str,
     function_name: str,
     workflow_id: str,
-    consume: int,
-    measure_unit: int,
+    token: Decimal,
+    measure_unit: int = 1,
+    unit: int = 1,
     is_enable: int = 1,
 ) -> PointConfig:
-    """创建积分配置"""
-    exists = (
-        db.query(PointConfig)
-        .filter(PointConfig.function_id == function_id)
-        .first()
-    )
-    if exists:
-        raise ValueError("function_id已存在")
+    """创建积分配置（uid自动生成）"""
     pc = PointConfig(
-        function_id=function_id,
         function_name=function_name,
         workflow_id=workflow_id,
-        consume=consume,
+        token=token,
         measure_unit=measure_unit,
+        unit=unit,
         is_enable=is_enable,
     )
     db.add(pc)
@@ -45,11 +39,11 @@ def get_point_config_by_workflow_id(db: Session, workflow_id: str) -> Optional[P
     )
 
 
-def get_point_config_by_function_id(db: Session, function_id: str) -> Optional[PointConfig]:
-    """根据function_id获取积分配置"""
+def get_point_config_by_uid(db: Session, uid: str) -> Optional[PointConfig]:
+    """根据uid获取积分配置"""
     return (
         db.query(PointConfig)
-        .filter(PointConfig.function_id == function_id)
+        .filter(PointConfig.uid == uid)
         .first()
     )
 
@@ -67,15 +61,16 @@ def list_point_configs(db: Session, skip: int = 0, limit: int = 20) -> List[Poin
 
 def update_point_config(
     db: Session,
-    function_id: str,
+    uid: str,
     function_name: Optional[str] = None,
     workflow_id: Optional[str] = None,
-    consume: Optional[int] = None,
+    token: Optional[Decimal] = None,
     measure_unit: Optional[int] = None,
+    unit: Optional[int] = None,
     is_enable: Optional[int] = None,
 ) -> Optional[PointConfig]:
-    """更新积分配置"""
-    pc = get_point_config_by_function_id(db, function_id)
+    """更新积分配置（按uid）"""
+    pc = get_point_config_by_uid(db, uid)
     if not pc:
         return None
 
@@ -83,10 +78,12 @@ def update_point_config(
         pc.function_name = function_name
     if workflow_id is not None:
         pc.workflow_id = workflow_id
-    if consume is not None:
-        pc.consume = consume
+    if token is not None:
+        pc.token = token
     if measure_unit is not None:
         pc.measure_unit = measure_unit
+    if unit is not None:
+        pc.unit = unit
     if is_enable is not None:
         pc.is_enable = is_enable
 
@@ -96,9 +93,9 @@ def update_point_config(
     return pc
 
 
-def delete_point_config(db: Session, function_id: str) -> bool:
-    """删除积分配置（硬删除）"""
-    pc = get_point_config_by_function_id(db, function_id)
+def delete_point_config(db: Session, uid: str) -> bool:
+    """删除积分配置（硬删除，按uid）"""
+    pc = get_point_config_by_uid(db, uid)
     if not pc:
         return False
     db.delete(pc)

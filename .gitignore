@@ -9,4 +9,5 @@ file
 .pytest_cache
 **/*.db
 other
-%APPDATA%/ai_marketing_server/
+
+src/resource/db_migrations/

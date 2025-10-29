@@ -1,5 +1,5 @@
 import json
-from typing import AsyncGenerator, Optional
+from typing import AsyncGenerator, Optional, Any
 from sqlalchemy.orm import Session
 
 from .point_service import PointService
@@ -18,7 +18,42 @@ async def wrap_sse_with_point_deduction(
     - 一边解析 "data:" 行的内容，聚合文本以进行按字符扣费
     - 流结束后进行扣费（allow_negative=True），避免中途断流
     """
-    aggregated_text_parts: list[str] = []
+    # 仅统计字符总数，避免聚合大文本造成内存占用
+    char_count: int = 0
+    # 行缓冲，保证跨 chunk 的行不会被截断
+    buffer: str = ""
+
+    def _count_text_in_json(obj: Any) -> int:
+        """粗略统计 JSON 中的文本长度：优先常见字段，其次遍历所有字符串值。"""
+        try:
+            if isinstance(obj, dict):
+                # 优先常见字段
+                for key in ("content", "text", "output", "result"):
+                    v = obj.get(key)
+                    if isinstance(v, str):
+                        return len(v)
+                # 次级：遍历所有字符串值（避免过度累加，仅取总长度）
+                total = 0
+                stack = [obj]
+                while stack:
+                    cur = stack.pop()
+                    if isinstance(cur, dict):
+                        for v in cur.values():
+                            stack.append(v)
+                    elif isinstance(cur, list):
+                        for v in cur:
+                            stack.append(v)
+                    elif isinstance(cur, str):
+                        total += len(cur)
+                return total
+            elif isinstance(obj, list):
+                return sum(_count_text_in_json(x) for x in obj)
+            elif isinstance(obj, str):
+                return len(obj)
+            else:
+                return len(str(obj))
+        except Exception:
+            return 0
 
     try:
         async for chunk in upstream_generator:
@@ -28,40 +63,52 @@ async def wrap_sse_with_point_deduction(
             except Exception:
                 decoded = ""
 
-            # 简单解析 SSE 格式：仅处理以 "data:" 开头的行
+            # 累积到缓冲，保证跨 chunk 的行不丢失
             if decoded:
-                for line in decoded.splitlines():
+                buffer += decoded
+
+                # 逐行处理，仅在完整行时计数（保留最后未结束的部分）
+                while True:
+                    idx = buffer.find("\n")
+                    if idx == -1:
+                        break
+                    line = buffer[:idx]
+                    buffer = buffer[idx + 1 :]
+
                     if line.startswith("data:"):
                         payload = line[len("data:") :].strip()
                         if not payload:
                             continue
-                        # 尝试解析 JSON，如果是结构化数据，优先提取 content 字段
+                        # JSON 优先解析，否则按纯文本
                         try:
                             obj = json.loads(payload)
-                            if isinstance(obj, dict):
-                                content = obj.get("content")
-                                if isinstance(content, str):
-                                    aggregated_text_parts.append(content)
-                                else:
-                                    # 如果没有 content 字段，则聚合原始文本化的 JSON
-                                    aggregated_text_parts.append(payload)
-                            else:
-                                aggregated_text_parts.append(str(obj))
+                            char_count += _count_text_in_json(obj)
                         except Exception:
-                            # 非 JSON，按纯文本聚合
-                            aggregated_text_parts.append(payload)
+                            char_count += len(payload)
+
             # 将块直接下发给客户端
             yield chunk
     finally:
         # 在流结束后进行扣费（允许负数，避免中途断流）
-        aggregated_text = "".join(aggregated_text_parts)
         try:
-            PointService.consume_points_by_response(
+            # 处理缓冲中的尾行（若以 data: 开头且未换行）
+            tail = buffer.strip()
+            if tail.startswith("data:"):
+                payload = tail[len("data:") :].strip()
+                if payload:
+                    try:
+                        obj = json.loads(payload)
+                        char_count += _count_text_in_json(obj)
+                    except Exception:
+                        char_count += len(payload)
+
+            # 按字符计量直接传入 usage_amount（允许负数）
+            PointService.consume_points(
                 db=db,
                 user_uid=user_uid,
                 from_user_uid=from_user_uid,
                 workflow_id=workflow_id,
-                response_text=aggregated_text,
+                usage_amount=char_count,
                 allow_negative=True,
                 record_desc_prefix=f"流式扣费: workflow_id={workflow_id}",
             )

@@ -1,5 +1,6 @@
 from sqlalchemy.orm import Session
 from typing import Optional, List, Tuple
+from decimal import Decimal, ROUND_HALF_UP
 from datetime import datetime
 
 from db.point_record import PointRecord
@@ -8,16 +9,20 @@ from db.point_record import PointRecord
 def create_point_record(
     db: Session,
     from_user_uid: str,
-    point: int,
+    point: Decimal,
     record_type: int,
     record_desc: Optional[str] = None,
+    function_name: Optional[str] = None,
+    from_uid: Optional[str] = None,
 ) -> PointRecord:
     """创建积分变动记录"""
     pr = PointRecord(
         from_user_uid=from_user_uid,
-        point=point,
+        point=Decimal(point or 0).quantize(Decimal('0.000001'), rounding=ROUND_HALF_UP),
         record_type=record_type,
         record_desc=record_desc,
+        function_name=function_name,
+        from_uid=from_uid,
     )
     db.add(pr)
     db.commit()

@@ -100,7 +100,7 @@ async def fetch_video_detail_service(aweme_id: str, user_id: str = None) -> Vide
     try:
         crawler = _get_active_crawler(user_id)
         logger.info(f"{'用户' + user_id + ' ' if user_id else ''}开始获取视频详情，aweme_id: {aweme_id}")
-        result = await crawler.fetch_post_detail(aweme_id)
+        result = await crawler.fetch_one_video(aweme_id)
         logger.info(f"{'用户' + user_id + ' ' if user_id else ''}成功获取视频详情")
         return _handle_response(
             result, "获取视频详情成功", "获取视频详情失败，未找到相关数据", VideoDetailResponse

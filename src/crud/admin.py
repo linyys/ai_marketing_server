@@ -66,6 +66,12 @@ def get_admin_by_uid(db: Session, uid: str) -> Optional[Admin]:
         and_(Admin.uid == uid, Admin.is_del == 0)
     ).first()
 
+def get_admin_by_phone(db: Session, phone: str) -> Optional[Admin]:
+    """根据手机号获取管理员"""
+    return db.query(Admin).filter(
+        and_(Admin.phone == phone, Admin.is_del == 0)
+    ).first()
+
 def get_admins(db: Session, skip: int = 0, limit: int = 20) -> List[Admin]:
     """获取管理员列表"""
     return db.query(Admin).filter(

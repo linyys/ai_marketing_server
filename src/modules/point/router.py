@@ -4,6 +4,7 @@ from db.database import get_db
 from utils.auth import get_current_admin, get_current_admin_or_user
 from pydantic import BaseModel
 from typing import Optional
+from decimal import Decimal
 
 from modules.point.controller import (
     create_config_service,
@@ -17,20 +18,21 @@ router = APIRouter(tags=["积分"], prefix="/point")
 
 
 class PointConfigCreate(BaseModel):
-    function_id: str
     function_name: str
     workflow_id: str
-    consume: int
+    token: Decimal
     measure_unit: int
+    unit: int
     is_enable: int = 1
 
 
 class PointConfigUpdate(BaseModel):
-    function_id: str
+    uid: str
     function_name: Optional[str] = None
     workflow_id: Optional[str] = None
-    consume: Optional[int] = None
+    token: Optional[Decimal] = None
     measure_unit: Optional[int] = None
+    unit: Optional[int] = None
     is_enable: Optional[int] = None
 
 
@@ -42,11 +44,11 @@ def create_config(
 ):
     return create_config_service(
         db=db,
-        function_id=data.function_id,
         function_name=data.function_name,
         workflow_id=data.workflow_id,
-        consume=data.consume,
+        token=data.token,
         measure_unit=data.measure_unit,
+        unit=data.unit,
         is_enable=data.is_enable,
     )
 
@@ -59,11 +61,12 @@ def update_config(
 ):
     return update_config_service(
         db=db,
-        function_id=data.function_id,
+        uid=data.uid,
         function_name=data.function_name,
         workflow_id=data.workflow_id,
-        consume=data.consume,
+        token=data.token,
         measure_unit=data.measure_unit,
+        unit=data.unit,
         is_enable=data.is_enable,
     )
 
